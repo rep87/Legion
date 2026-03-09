@@ -169,20 +169,20 @@ function formatEnemyDebugLabel(enemy) {
 
 function formatPartTypeLabel(partType) {
   return {
-    arm: "??,
-    leg: "?ㅻ━",
-    head: "癒몃━",
-    body: "紐명넻",
+    arm: "\uD314",
+    leg: "\uB2E4\uB9AC",
+    head: "\uBA38\uB9AC",
+    body: "\uBAB8\uD1B5",
   }[partType] || partType;
 }
 
 function buildDropDebugMessage(enemy, droppedParts) {
   if (!droppedParts.length) {
-    return `${formatEnemyDebugLabel(enemy)} 泥섏튂 -> ?쒕∼ ?놁쓬`;
+    return `${formatEnemyDebugLabel(enemy)} \uCC98\uCE58 -> \uB4DC\uB86D \uC5C6\uC74C`;
   }
 
   const firstDrop = droppedParts[0];
-  return `${formatEnemyDebugLabel(enemy)} 泥섏튂 -> ${formatPartTypeLabel(firstDrop.partType)}(${firstDrop.grade}) ?쒕∼`;
+  return `${formatEnemyDebugLabel(enemy)} \uCC98\uCE58 -> ${formatPartTypeLabel(firstDrop.partType)}(${firstDrop.grade}) \uB4DC\uB86D`;
 }
 
 function getPathForRegion(region) {
@@ -321,7 +321,7 @@ function damageBaseFromEnemy(enemy) {
 
   enemy.reachedBase = true;
   gameState.baseHP = Math.max(0, gameState.baseHP - enemy.attack);
-  gameState.message = `${enemy.bossType === "region" ? "지역 보스" : enemy.isBoss ? "보스" : "적 로봇"}가 기지에 ${enemy.attack} 피해를 입혔습니다.`;
+  gameState.message = `${enemy.bossType === "region" ? "\uC9C0\uC5ED \uBCF4\uC2A4" : "\uC6E8\uC774\uBE0C \uBCF4\uC2A4"}\uAC00 \uC544\uAD70 \uB85C\uBD07\uC5D0 ${enemy.attack} \uD53C\uD574\uB97C \uC785\uD614\uC2B5\uB2C8\uB2E4.`;
 }
 
 function maybeDamageRobot(enemy, now) {
@@ -383,7 +383,7 @@ function spawnWave() {
 
   if (gameState.isBossWave) {
     gameState.enemies.push(createEnemy({ region, wave, boss: "wave", type: "crusher" }));
-    gameState.message = `${region}지역 ${wave}웨이브 보스 출현. 방어선을 유지하세요.`;
+    gameState.message = `${region}\uC9C0\uC5ED ${wave}\uC6E8\uC774\uBE0C \uBCF4\uC2A4 \uCD9C\uD604. \uBC29\uC5B4\uC120\uC744 \uC720\uC9C0\uD558\uC138\uC694.`;
     return gameState.enemies;
   }
 
@@ -394,7 +394,7 @@ function spawnWave() {
     gameState.enemies.push(enemy);
   }
 
-  gameState.message = `${region}지역 ${wave}웨이브 적 로봇 ${count}기가 경로에 투입되었습니다.`;
+  gameState.message = `${region}\uC9C0\uC5ED ${wave}\uC6E8\uC774\uBE0C \uC801 \uB85C\uBD07 ${count}\uAE30\uAC00 \uACBD\uB85C\uC5D0 \uD22C\uC785\uB418\uC5C8\uC2B5\uB2C8\uB2E4.`;
   return gameState.enemies;
 }
 
@@ -409,7 +409,7 @@ function spawnRegionBoss(region = getGameState().currentRegion) {
   boss.radius = 18;
   boss.speed = Math.max(22, boss.speed - 8);
   gameState.enemies.push(boss);
-  gameState.message = `${region}지역 지역 보스가 출현했습니다. 처치 시 다음 지역이 개방됩니다.`;
+  gameState.message = `${region}\uC9C0\uC5ED \uC9C0\uC5ED \uBCF4\uC2A4\uAC00 \uCD9C\uD604\uD588\uC2B5\uB2C8\uB2E4. \uCC98\uCE58 \uC2DC \uB2E4\uC74C \uC9C0\uC5ED\uC774 \uAC1C\uBC29\uB429\uB2C8\uB2E4.`;
   return boss;
 }
 
@@ -422,7 +422,7 @@ function triggerRegionTransition(region) {
     gameState.wave = 1;
     gameState.isBossWave = false;
     gameState.waveActive = false;
-    gameState.message = "A지역 지역 보스 격파. B지역 전환 트리거가 활성화되었습니다.";
+    gameState.message = "B\uC9C0\uC5ED \uC9C0\uC5ED \uBCF4\uC2A4\uB97C \uACA9\uD30C\uD588\uC2B5\uB2C8\uB2E4. \uD604\uC7AC \uAD6C\uD604 \uBC94\uC704\uC5D0\uC11C \uBAA8\uB4E0 \uC9C0\uC5ED\uC774 \uC815\uB9AC\uB418\uC5C8\uC2B5\uB2C8\uB2E4.";
     return;
   }
 
@@ -447,8 +447,8 @@ function handleEnemyDeath(enemy) {
     triggerRegionTransition(enemy.region);
   } else {
     gameState.message = enemy.isBoss
-      ? `${enemy.region}지역 웨이브 보스를 격파했습니다.`
-      : "적 로봇을 파괴하고 전리품을 회수할 수 있습니다.";
+      ? `${enemy.region}\uC9C0\uC5ED \uC6E8\uC774\uBE0C \uBCF4\uC2A4\uB97C \uACA9\uD30C\uD588\uC2B5\uB2C8\uB2E4.`
+      : "\uC801 \uB85C\uBD07\uC744 \uD30C\uAD34\uD558\uACE0 \uC804\uB9AC\uD488\uC744 \uD68C\uC218\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.";
   }
 }
 
