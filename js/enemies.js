@@ -266,8 +266,17 @@ function createItemDrop(x, y, kind, amount = 1, extra = {}) {
   };
 }
 
+function ensureDroppedItems(gameState) {
+  if (!Array.isArray(gameState.droppedItems)) {
+    gameState.droppedItems = [];
+  }
+
+  return gameState.droppedItems;
+}
+
 function dropLoot(enemy) {
   const gameState = getGameState();
+  const droppedItems = ensureDroppedItems(gameState);
   const droppedParts = [];
   const shouldDropPart = Math.random() < DEBUG_PART_DROP_RATE;
   const partDropCount = shouldDropPart ? 1 + Math.floor(Math.random() * 2) : 0;
@@ -281,10 +290,10 @@ function dropLoot(enemy) {
       partType,
     });
     droppedParts.push(drop);
-    gameState.droppedItems.push(drop);
+    droppedItems.push(drop);
   }
 
-  gameState.droppedItems.push(
+  droppedItems.push(
     createItemDrop(enemy.x + 12, enemy.y + 8, "gold", enemy.goldReward, {
       icon: "G",
     })
@@ -349,7 +358,7 @@ function maybeDamageRobot(enemy, now) {
 
 function removeExpiredDrops(now = performance.now()) {
   const gameState = getGameState();
-  gameState.droppedItems = gameState.droppedItems.filter((item) => item.expiresAt > now);
+  gameState.droppedItems = ensureDroppedItems(gameState).filter((item) => item.expiresAt > now);
 }
 
 function spawnWave() {
@@ -414,6 +423,13 @@ function triggerRegionTransition(region) {
 
 function handleEnemyDeath(enemy) {
   const gameState = getGameState();
+  if (!enemy || enemy.lootHandled) {
+    return;
+  }
+
+  enemy.lootHandled = true;
+  enemy.isDead = true;
+  enemy.dead = true;
   dropLoot(enemy);
 
   if (enemy.bossType === "region") {
@@ -450,7 +466,12 @@ function updateEnemies(deltaSeconds) {
   const survivors = [];
 
   for (const enemy of gameState.enemies) {
-    if (enemy.hp <= 0) {
+    if (!enemy) {
+      continue;
+    }
+
+    if (enemy.hp <= 0 || enemy.isDead || enemy.dead) {
+      handleEnemyDeath(enemy);
       continue;
     }
 

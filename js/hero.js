@@ -360,6 +360,10 @@ function damageEnemy(enemy, amount) {
     return false;
   }
 
+  if (enemy.id && typeof window.enemySystem?.damageEnemy === "function") {
+    return Boolean(window.enemySystem.damageEnemy(enemy.id, amount));
+  }
+
   if (typeof enemy.takeDamage === "function") {
     enemy.takeDamage(amount, { source: "hero" });
     return true;

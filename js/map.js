@@ -333,6 +333,40 @@ function drawEnemies(ctx, gameState) {
   }
 }
 
+function drawDroppedItems(ctx, gameState) {
+  if (!Array.isArray(gameState.droppedItems)) {
+    return;
+  }
+
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = '11px "Courier New", monospace';
+
+  for (const item of gameState.droppedItems) {
+    if (!item || typeof item.x !== "number" || typeof item.y !== "number" || isTurretItem(item)) {
+      continue;
+    }
+
+    if (item.kind === "gold") {
+      ctx.fillStyle = "#ffcf70";
+      ctx.beginPath();
+      ctx.arc(item.x, item.y, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#0e1319";
+      ctx.fillText("G", item.x, item.y + 0.5);
+      continue;
+    }
+
+    ctx.fillStyle = "#8fd3ff";
+    ctx.fillRect(item.x - 7, item.y - 7, 14, 14);
+    ctx.fillStyle = "#081018";
+    ctx.fillText(item.icon || "P", item.x, item.y + 0.5);
+  }
+
+  ctx.restore();
+}
+
 function drawDroppedTurretHints(ctx, gameState) {
   if (!Array.isArray(gameState.droppedItems)) {
     return;
@@ -645,6 +679,7 @@ function renderScene(ctx) {
   drawBase(ctx, gameState, theme);
   drawDroppedTurretHints(ctx, gameState);
   drawEnemies(ctx, gameState);
+  drawDroppedItems(ctx, gameState);
   drawHero(ctx, gameState);
   drawFog(ctx, gameState);
   drawPath(ctx, gameState, theme);
