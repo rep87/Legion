@@ -8,6 +8,14 @@ const GRADE_TABLE = [
 const DROP_LIFETIME_MS = 30000;
 const BASE_REACH_RADIUS = 12;
 const ROBOT_THREAT_RADIUS = 92;
+const ENEMY_SPRITE_DRAW_SIZE = 32;
+const BOSS_SPRITE_DRAW_SIZE = 42;
+const ENEMY_SPRITE_PATHS = {
+  C: new URL("../assets/enemies/enemy_c_32.png", import.meta.url).href,
+  B: new URL("../assets/enemies/enemy_b_32.png", import.meta.url).href,
+  A: new URL("../assets/enemies/enemy_a_32.png", import.meta.url).href,
+  S: new URL("../assets/enemies/enemy_s_32.png", import.meta.url).href,
+};
 
 const FALLBACK_PATHS = {
   A: [
@@ -31,6 +39,31 @@ const FALLBACK_PATHS = {
 const REGION_TEMPLATES = {
   A: { hp: 40, speed: 46, attack: 8, gold: 8, color: "#e76845" },
   B: { hp: 62, speed: 54, attack: 12, gold: 12, color: "#ff9258" },
+};
+
+function createSpriteAsset(src, label) {
+  const image = new Image();
+  const asset = { image, loaded: false, failed: false, src };
+
+  image.addEventListener("load", () => {
+    asset.loaded = true;
+  }, { once: true });
+
+  image.addEventListener("error", () => {
+    asset.failed = true;
+    console.warn(`Failed to load ${label} sprite: ${src}`);
+  }, { once: true });
+
+  image.src = src;
+  return asset;
+}
+
+const enemySpriteAssets = Object.fromEntries(
+  Object.entries(ENEMY_SPRITE_PATHS).map(([grade, src]) => [grade, createSpriteAsset(src, `enemy-${grade}`)])
+);
+
+const enemyVisualState = {
+  initialized: false,
 };
 
 function getGameState() {
@@ -109,6 +142,7 @@ function createEnemy(options = {}) {
 
   return {
     id: randomId("enemy"),
+    grade: options.grade || (options.boss === "region" ? "S" : options.boss === "wave" ? "A" : pickWeightedGrade()),
     type: options.type || "scout",
     region,
     wave,
@@ -347,6 +381,71 @@ function updateEnemies(deltaSeconds) {
   removeExpiredDrops(now);
 }
 
+function isPointVisible(x, y) {
+  const gameState = getGameState();
+  if (!gameState || !Array.isArray(gameState.fogOfWar) || gameState.fogOfWar.length === 0) {
+    return true;
+  }
+
+  return gameState.fogOfWar.some((zone) => {
+    const dx = x - zone.x;
+    const dy = y - zone.y;
+    return dx * dx + dy * dy <= zone.radius * zone.radius;
+  });
+}
+
+function getEnemySpriteAsset(enemy) {
+  if (!enemy || !enemy.grade) {
+    return enemySpriteAssets.C;
+  }
+
+  return enemySpriteAssets[enemy.grade] || enemySpriteAssets.C;
+}
+
+function drawEnemySprites() {
+  const gameState = getGameState();
+  const canvas = document.getElementById("game-canvas");
+  const ctx = canvas?.getContext("2d");
+  if (!gameState || !ctx || !Array.isArray(gameState.enemies)) {
+    return;
+  }
+
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+
+  for (const enemy of gameState.enemies) {
+    if (!enemy || typeof enemy.x !== "number" || typeof enemy.y !== "number") {
+      continue;
+    }
+
+    const asset = getEnemySpriteAsset(enemy);
+    if (!asset.loaded) {
+      continue;
+    }
+
+    const size = enemy.isBoss ? BOSS_SPRITE_DRAW_SIZE : ENEMY_SPRITE_DRAW_SIZE;
+    const drawX = Math.round(enemy.x - size / 2);
+    const drawY = Math.round(enemy.y - size / 2);
+    ctx.drawImage(asset.image, drawX, drawY, size, size);
+  }
+
+  ctx.restore();
+}
+
+function enemyVisualFrame() {
+  drawEnemySprites();
+  window.requestAnimationFrame(enemyVisualFrame);
+}
+
+function initEnemyVisuals() {
+  if (enemyVisualState.initialized) {
+    return;
+  }
+
+  enemyVisualState.initialized = true;
+  window.requestAnimationFrame(enemyVisualFrame);
+}
+
 function drawEnemy(ctx, enemy) {
   ctx.fillStyle = enemy.color;
   ctx.fillRect(enemy.x - enemy.radius, enemy.y - enemy.radius, enemy.radius * 2, enemy.radius * 2);
@@ -413,9 +512,16 @@ const enemySystem = {
   spawnRegionBoss,
   update: updateEnemies,
   draw: drawEnemies,
+  drawSprites: drawEnemySprites,
   damageEnemy,
   syncWaveSpawns,
   removeExpiredDrops,
 };
 
 window.enemySystem = enemySystem;
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initEnemyVisuals, { once: true });
+} else {
+  initEnemyVisuals();
+}

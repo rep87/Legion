@@ -7,6 +7,8 @@ const HERO_LOOT_RANGE = 92;
 const HERO_SLOT_COUNT = 2;
 const INVENTORY_SLOT_COUNT = 9;
 const LOOT_CLICK_RADIUS = 18;
+const HERO_SPRITE_DRAW_SIZE = 32;
+const HERO_SPRITE_PATH = new URL("../assets/hero/hero_32_base.png", import.meta.url).href;
 
 const gameState = window.gameState;
 
@@ -38,6 +40,25 @@ if (!Array.isArray(gameState.inventory) && !Array.isArray(gameState.inventory?.s
 if (!Array.isArray(hero.items)) {
   hero.items = Array(HERO_SLOT_COUNT).fill(null);
 }
+
+function createSpriteAsset(src) {
+  const image = new Image();
+  const asset = { image, loaded: false, failed: false, src };
+
+  image.addEventListener("load", () => {
+    asset.loaded = true;
+  }, { once: true });
+
+  image.addEventListener("error", () => {
+    asset.failed = true;
+    console.warn(`Failed to load hero sprite: ${src}`);
+  }, { once: true });
+
+  image.src = src;
+  return asset;
+}
+
+const heroSpriteAsset = createSpriteAsset(HERO_SPRITE_PATH);
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -431,6 +452,34 @@ function onCanvasPointerDown(event) {
   heroState.targetY = coordinates.y;
 }
 
+function isHeroVisible() {
+  if (!Array.isArray(gameState.fogOfWar) || gameState.fogOfWar.length === 0) {
+    return true;
+  }
+
+  return gameState.fogOfWar.some((zone) => {
+    const dx = heroState.x - zone.x;
+    const dy = heroState.y - zone.y;
+    return dx * dx + dy * dy <= zone.radius * zone.radius;
+  });
+}
+
+function drawHeroSprite() {
+  const canvas = document.getElementById("game-canvas");
+  const ctx = canvas?.getContext("2d");
+  if (!ctx || !heroSpriteAsset.loaded || !isHeroVisible()) {
+    return;
+  }
+
+  const drawX = Math.round(heroState.x - HERO_SPRITE_DRAW_SIZE / 2);
+  const drawY = Math.round(heroState.y - HERO_SPRITE_DRAW_SIZE / 2);
+
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(heroSpriteAsset.image, drawX, drawY, HERO_SPRITE_DRAW_SIZE, HERO_SPRITE_DRAW_SIZE);
+  ctx.restore();
+}
+
 function onKeyChange(event, pressed) {
   if (event.repeat && pressed) {
     return;
@@ -467,6 +516,8 @@ function tick() {
   heroState.attackCooldown = Math.max(0, heroState.attackCooldown - deltaSeconds);
   updateMovement(deltaSeconds);
   renderHeroSlots();
+  drawHeroSprite();
+  window.enemySystem?.drawSprites?.();
   window.requestAnimationFrame(tick);
 }
 
@@ -482,6 +533,8 @@ function wrapAdvanceTime() {
     heroState.attackCooldown = Math.max(0, heroState.attackCooldown - deltaSeconds);
     updateMovement(deltaSeconds);
     renderHeroSlots();
+    drawHeroSprite();
+    window.enemySystem?.drawSprites?.();
   };
 }
 
