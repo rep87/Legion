@@ -53,9 +53,10 @@ const REGION_TEMPLATES = {
 
 function createSpriteAsset(src, label) {
   const image = new Image();
-  const asset = { image, loaded: false, failed: false, src };
+  const asset = { image, loaded: false, failed: false, src, renderSource: image };
 
   image.addEventListener("load", () => {
+    asset.renderSource = image;
     asset.loaded = true;
   }, { once: true });
 
@@ -554,7 +555,7 @@ function drawDroppedItemSprites(ctx, gameState) {
     const drawY = Math.round(item.y - DROP_ICON_DRAW_SIZE / 2);
 
     if (asset?.loaded) {
-      ctx.drawImage(asset.renderSource, drawX, drawY, DROP_ICON_DRAW_SIZE, DROP_ICON_DRAW_SIZE);
+      ctx.drawImage(asset.renderSource || asset.image, drawX, drawY, DROP_ICON_DRAW_SIZE, DROP_ICON_DRAW_SIZE);
       continue;
     }
 
@@ -589,7 +590,7 @@ function drawEnemySprites() {
     const size = enemy.isBoss ? BOSS_SPRITE_DRAW_SIZE : ENEMY_SPRITE_DRAW_SIZE;
     const drawX = Math.round(enemy.x - size / 2);
     const drawY = Math.round(enemy.y - size / 2);
-    ctx.drawImage(asset.renderSource, drawX, drawY, size, size);
+    ctx.drawImage(asset.renderSource || asset.image, drawX, drawY, size, size);
   }
 
   ctx.textAlign = "center";

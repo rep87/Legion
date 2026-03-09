@@ -692,7 +692,7 @@ function drawHeroSprite() {
 
   ctx.save();
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(heroSpriteAsset.renderSource, drawX, drawY, HERO_SPRITE_DRAW_SIZE, HERO_SPRITE_DRAW_SIZE);
+  ctx.drawImage(heroSpriteAsset.renderSource || heroSpriteAsset.image, drawX, drawY, HERO_SPRITE_DRAW_SIZE, HERO_SPRITE_DRAW_SIZE);
   ctx.restore();
 }
 
