@@ -40,3 +40,5 @@ ew URL(..., import.meta.url) 기반 PNG 로더를 추가하고, map.js 수정 없이 캔버스 �
 - 2026-03-09: Playwright 캡처로 hero PNG 적용 확인 (output/web-game/shot-0.png).
 - 2026-03-09: 추가 Playwright 검증에서 wave 시작 후 enemy PNG가 캔버스에 렌더되는 것 확인 (output/web-game/enemy-center-shot-wait.png).
 
+- 2026-03-09: hero sprite 로드 시 밝은 저채도 배경 픽셀을 제거하는 전처리를 js/hero.js에 추가해 흰 배경이 보이지 않도록 수정.
+

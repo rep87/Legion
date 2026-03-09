@@ -43,9 +43,10 @@ if (!Array.isArray(hero.items)) {
 
 function createSpriteAsset(src) {
   const image = new Image();
-  const asset = { image, loaded: false, failed: false, src };
+  const asset = { image, loaded: false, failed: false, src, renderSource: image };
 
   image.addEventListener("load", () => {
+    asset.renderSource = stripHeroBackdrop(image);
     asset.loaded = true;
   }, { once: true });
 
@@ -59,6 +60,44 @@ function createSpriteAsset(src) {
 }
 
 const heroSpriteAsset = createSpriteAsset(HERO_SPRITE_PATH);
+
+function stripHeroBackdrop(image) {
+  const canvas = document.createElement("canvas");
+  canvas.width = image.naturalWidth || image.width;
+  canvas.height = image.naturalHeight || image.height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) {
+    return image;
+  }
+
+  ctx.drawImage(image, 0, 0);
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const { data } = imageData;
+
+  for (let index = 0; index < data.length; index += 4) {
+    const red = data[index];
+    const green = data[index + 1];
+    const blue = data[index + 2];
+    const alpha = data[index + 3];
+    if (alpha === 0) {
+      continue;
+    }
+
+    const minChannel = Math.min(red, green, blue);
+    const maxChannel = Math.max(red, green, blue);
+    const channelSpread = maxChannel - minChannel;
+    const average = (red + green + blue) / 3;
+    const brightBackdrop = average >= 218 && channelSpread <= 20;
+    const nearWhiteBackdrop = red >= 228 && green >= 228 && blue >= 228;
+
+    if (brightBackdrop || nearWhiteBackdrop) {
+      data[index + 3] = 0;
+    }
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+  return canvas;
+}
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -476,7 +515,7 @@ function drawHeroSprite() {
 
   ctx.save();
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(heroSpriteAsset.image, drawX, drawY, HERO_SPRITE_DRAW_SIZE, HERO_SPRITE_DRAW_SIZE);
+  ctx.drawImage(heroSpriteAsset.renderSource, drawX, drawY, HERO_SPRITE_DRAW_SIZE, HERO_SPRITE_DRAW_SIZE);
   ctx.restore();
 }
 
