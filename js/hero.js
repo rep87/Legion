@@ -31,11 +31,8 @@ const heroState = {
   lastFogSignalY: Number.isFinite(hero.y) ? hero.y : 300,
   initialized: false,
   lastTick: performance.now(),
+  localItemId: 0,
 };
-
-if (!Array.isArray(gameState.inventory) && !Array.isArray(gameState.inventory?.slots)) {
-  gameState.inventory = Array(INVENTORY_SLOT_COUNT).fill(null);
-}
 
 if (!Array.isArray(hero.items)) {
   hero.items = Array(HERO_SLOT_COUNT).fill(null);
@@ -45,15 +42,23 @@ function createSpriteAsset(src) {
   const image = new Image();
   const asset = { image, loaded: false, failed: false, src, renderSource: image };
 
-  image.addEventListener("load", () => {
-    asset.renderSource = stripHeroBackdrop(image);
-    asset.loaded = true;
-  }, { once: true });
+  image.addEventListener(
+    "load",
+    () => {
+      asset.renderSource = stripHeroBackdrop(image);
+      asset.loaded = true;
+    },
+    { once: true }
+  );
 
-  image.addEventListener("error", () => {
-    asset.failed = true;
-    console.warn(`Failed to load hero sprite: ${src}`);
-  }, { once: true });
+  image.addEventListener(
+    "error",
+    () => {
+      asset.failed = true;
+      console.warn(`Failed to load hero sprite: ${src}`);
+    },
+    { once: true }
+  );
 
   image.src = src;
   return asset;
@@ -103,7 +108,7 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-function getInventorySlots() {
+function ensureInventoryState() {
   if (Array.isArray(gameState.inventory)) {
     return gameState.inventory;
   }
@@ -114,6 +119,15 @@ function getInventorySlots() {
 
   gameState.inventory = Array(INVENTORY_SLOT_COUNT).fill(null);
   return gameState.inventory;
+}
+
+function getInventorySlots() {
+  return ensureInventoryState();
+}
+
+function nextLocalItemId() {
+  heroState.localItemId += 1;
+  return `hero-item-${heroState.localItemId}`;
 }
 
 function setHeroPosition(x, y) {
@@ -236,9 +250,9 @@ function formatItemLabel(item) {
     return item.toUpperCase();
   }
 
-  const grade = item.grade ? `${item.grade} ` : "";
-  const name = item.name || item.type || "ITEM";
-  return `${grade}${String(name).toUpperCase()}`;
+  const grade = item.grade || item.rank || "";
+  const name = item.name || item.label || item.type || item.partType || "ITEM";
+  return `${grade ? `${grade} ` : ""}${String(name).toUpperCase()}`;
 }
 
 function renderHeroSlots() {
@@ -252,6 +266,32 @@ function renderHeroSlots() {
     slotNode.textContent = formatItemLabel(item);
     slotNode.classList.toggle("filled", Boolean(item));
   });
+}
+
+function renderInventoryFallback() {
+  const grid = document.getElementById("inventory-grid");
+  if (!grid) {
+    return;
+  }
+
+  const slots = getInventorySlots();
+  const children = Array.from(grid.children);
+  children.forEach((child, index) => {
+    if (child.classList.contains("inventory-slot")) {
+      return;
+    }
+
+    const item = slots[index] || null;
+    child.textContent = item ? formatItemLabel(item) : String(index + 1);
+    child.title = item ? formatItemLabel(item) : "EMPTY";
+    child.style.color = item ? "#e7edf7" : "#8b98aa";
+    child.style.padding = item ? "6px" : "0";
+    child.style.textAlign = "center";
+  });
+}
+
+function syncInventoryDisplay() {
+  renderInventoryFallback();
 }
 
 function setStatus(message) {
@@ -272,11 +312,13 @@ function signalFogUpdate(force) {
     radius: HERO_SIGHT_RADIUS,
     source: "hero",
   };
+
   if (window.mapSystem?.revealArea) {
     window.mapSystem.revealArea(reveal.x, reveal.y, reveal.radius, `hero:manual:${reveal.x}:${reveal.y}`);
   } else {
     gameState.fogOfWar.push(reveal);
   }
+
   heroState.lastFogSignalX = heroState.x;
   heroState.lastFogSignalY = heroState.y;
 
@@ -291,14 +333,61 @@ function inventoryHasSpace() {
   return getInventorySlots().some((slot) => slot === null);
 }
 
+function mapPartType(rawType) {
+  return {
+    arm: "arm",
+    leg: "legs",
+    legs: "legs",
+    head: "head",
+    body: "torso",
+    torso: "torso",
+    disassembler: "disassembler",
+  }[rawType] || "arm";
+}
+
+function normalizeInventoryItem(item) {
+  if (!item) {
+    return null;
+  }
+
+  if (item.id && item.rank && item.type) {
+    return item;
+  }
+
+  const type = mapPartType(item.partType || item.type || item.kind);
+  const rank = item.rank || item.grade || "C";
+  const saleValueTable = { C: 10, B: 25, A: 55, S: 125 };
+  return {
+    id: nextLocalItemId(),
+    type,
+    rank,
+    label: type === "disassembler" ? "DISASSEMBLER" : `${type.toUpperCase()}-${rank}`,
+    saleValue: saleValueTable[rank] || 10,
+    isDisassemblyTool: type === "disassembler",
+    sourceDropId: item.id || null,
+  };
+}
+
 function addItemToInventory(item) {
+  const normalizedItem = normalizeInventoryItem(item);
+  if (!normalizedItem) {
+    return false;
+  }
+
+  if (window.inventorySystem?.addItem) {
+    const added = window.inventorySystem.addItem(normalizedItem);
+    syncInventoryDisplay();
+    return added;
+  }
+
   const slots = getInventorySlots();
   const emptyIndex = slots.findIndex((slot) => slot === null);
   if (emptyIndex === -1) {
     return false;
   }
 
-  slots[emptyIndex] = item;
+  slots[emptyIndex] = normalizedItem;
+  syncInventoryDisplay();
   return true;
 }
 
@@ -320,26 +409,45 @@ function resolveDroppedItemPosition(item) {
   };
 }
 
+function collectGold(item) {
+  const goldAmount = Math.max(0, Number(item?.amount) || 0);
+  gameState.gold = (gameState.gold || 0) + goldAmount;
+  setStatus(`°ñµå ${goldAmount} È¹µæ.`);
+  syncInventoryDisplay();
+  return true;
+}
+
 function lootItem(item, index) {
   const position = resolveDroppedItemPosition(item);
   const distance = Math.hypot(heroState.x - position.x, heroState.y - position.y);
   if (distance > HERO_LOOT_RANGE) {
-    setStatus("ì•„ì´í…œì´ ë„ˆë¬´ ë©‰ë‹ˆë‹¤.");
+    setStatus("¾ÆÀÌÅÛÀÌ ³Ê¹« ¸Ù´Ï´Ù.");
     return false;
+  }
+
+  if (item?.kind === "gold") {
+    collectGold(item);
+    gameState.droppedItems.splice(index, 1);
+    return true;
   }
 
   if (!inventoryHasSpace()) {
-    setStatus("ì¸ë²¤í† ë¦¬ê°€ ê½‰ ì°¼ìŠµë‹ˆë‹¤");
+    setStatus("ÀÎº¥Åä¸®°¡ ²Ë Ã¡½À´Ï´Ù");
     return false;
   }
 
-  const payload = item && item.payload ? item.payload : item;
-  const equipped = equipHeroItem(payload);
-  addItemToInventory(payload);
+  const inventoryItem = normalizeInventoryItem(item && item.payload ? item.payload : item);
+  const equipped = equipHeroItem(inventoryItem);
+  const added = addItemToInventory(inventoryItem);
+  if (!added) {
+    setStatus("ÀÎº¥Åä¸®°¡ ²Ë Ã¡½À´Ï´Ù");
+    return false;
+  }
 
   gameState.droppedItems.splice(index, 1);
-  setStatus(equipped ? `${formatItemLabel(payload)} ì¥ì°© ë° íšŒìˆ˜ ì™„ë£Œ.` : `${formatItemLabel(payload)} íšŒìˆ˜ ì™„ë£Œ.`);
+  setStatus(equipped ? `${formatItemLabel(inventoryItem)} ÀåÂø ¹× È¸¼ö ¿Ï·á.` : `${formatItemLabel(inventoryItem)} È¸¼ö ¿Ï·á.`);
   renderHeroSlots();
+  syncInventoryDisplay();
   return true;
 }
 
@@ -402,23 +510,31 @@ function findAttackTarget() {
   return nearest;
 }
 
-function performAttack() {
+function performAttack(options = {}) {
+  const silent = Boolean(options.silent);
+  const automatic = Boolean(options.automatic);
+
   if (heroState.attackCooldown > 0) {
     return false;
   }
 
   const target = findAttackTarget();
-  heroState.attackCooldown = HERO_ATTACK_COOLDOWN;
-
   if (!target) {
-    setStatus("ê·¼ì ‘ ê³µê²© ë²”ìœ„ì— ì ì´ ì—†ìŠµë‹ˆë‹¤.");
+    if (!silent) {
+      setStatus("±ÙÁ¢ °ø°İ ¹üÀ§¿¡ ÀûÀÌ ¾ø½À´Ï´Ù.");
+    }
     return false;
   }
 
+  heroState.attackCooldown = HERO_ATTACK_COOLDOWN;
   damageEnemy(target, HERO_ATTACK_DAMAGE);
   pruneDeadEnemies();
-  setStatus(`ê·¼ì ‘ ê³µê²© ì ì¤‘: ${HERO_ATTACK_DAMAGE} í”¼í•´.`);
+  setStatus(automatic ? `ÀÚµ¿ °ø°İ ÀûÁß: ${HERO_ATTACK_DAMAGE} ÇÇÇØ.` : `±ÙÁ¢ °ø°İ ÀûÁß: ${HERO_ATTACK_DAMAGE} ÇÇÇØ.`);
   return true;
+}
+
+function updateAutoAttack() {
+  performAttack({ automatic: true, silent: true });
 }
 
 function normalizeVector(x, y) {
@@ -558,7 +674,9 @@ function tick() {
   heroState.lastTick = now;
   heroState.attackCooldown = Math.max(0, heroState.attackCooldown - deltaSeconds);
   updateMovement(deltaSeconds);
+  updateAutoAttack();
   renderHeroSlots();
+  syncInventoryDisplay();
   drawHeroSprite();
   window.enemySystem?.drawSprites?.();
   window.requestAnimationFrame(tick);
@@ -575,7 +693,9 @@ function wrapAdvanceTime() {
     const deltaSeconds = Math.max(0, ms / 1000);
     heroState.attackCooldown = Math.max(0, heroState.attackCooldown - deltaSeconds);
     updateMovement(deltaSeconds);
+    updateAutoAttack();
     renderHeroSlots();
+    syncInventoryDisplay();
     drawHeroSprite();
     window.enemySystem?.drawSprites?.();
   };
@@ -602,6 +722,7 @@ function initHeroSystem() {
   patchHeroPosition();
   bindHeroControls();
   renderHeroSlots();
+  syncInventoryDisplay();
   signalFogUpdate(true);
   wrapAdvanceTime();
   window.requestAnimationFrame(tick);
