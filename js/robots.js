@@ -1,5 +1,6 @@
 const ROBOT_REQUIRED_PARTS = ["arm", "legs", "head", "torso"];
 const ROBOT_RANKS = ["C", "B", "A", "S"];
+const ROBOT_SPRITE_PATH = new URL("../assets/robots/ally_robot_32_base.png", import.meta.url).href;
 const ROBOT_PATH_SLOTS = [
   { id: "slot-alpha", label: "Alpha", x: 180, y: 500 },
   { id: "slot-bravo", label: "Bravo", x: 270, y: 360 },
@@ -14,6 +15,26 @@ const ROBOT_RANK_AURA = {
   S: { radius: 140, bonus: 0.18 },
 };
 const ROBOT_RANK_COST = { C: 20, B: 40, A: 75, S: 120 };
+const ROBOT_ATTACK_RANGE_BASE = 92;
+const ROBOT_ATTACK_DAMAGE_BASE = 12;
+const ROBOT_ATTACK_COOLDOWN_BASE = 1.25;
+const ROBOT_SPRITE_SIZE = 32;
+const ROBOT_ATTACK_FLASH_MS = 140;
+
+function createSpriteAsset(src) {
+  const image = new Image();
+  const asset = { image, loaded: false, failed: false };
+  image.addEventListener("load", () => {
+    asset.loaded = true;
+  }, { once: true });
+  image.addEventListener("error", () => {
+    asset.failed = true;
+  }, { once: true });
+  image.src = src;
+  return asset;
+}
+
+const robotSpriteAsset = createSpriteAsset(ROBOT_SPRITE_PATH);
 
 function createRobotsModule() {
   const gameState = window.gameState ?? {};
@@ -206,6 +227,28 @@ function createRobotsModule() {
     return Math.floor(total * 0.5);
   }
 
+  function getRankIndex(rank) {
+    return Math.max(0, ROBOT_RANKS.indexOf(rank));
+  }
+
+  function computeAttackRange(parts) {
+    const armRank = parts.find((part) => part.type === "arm")?.rank ?? "C";
+    const headRank = parts.find((part) => part.type === "head")?.rank ?? "C";
+    return ROBOT_ATTACK_RANGE_BASE + getRankIndex(armRank) * 16 + getRankIndex(headRank) * 12;
+  }
+
+  function computeAttackDamage(parts) {
+    const armRank = parts.find((part) => part.type === "arm")?.rank ?? "C";
+    const legsRank = parts.find((part) => part.type === "legs")?.rank ?? "C";
+    return ROBOT_ATTACK_DAMAGE_BASE + getRankIndex(armRank) * 7 + getRankIndex(legsRank) * 4;
+  }
+
+  function computeAttackCooldown(parts) {
+    const headRank = parts.find((part) => part.type === "head")?.rank ?? "C";
+    const armRank = parts.find((part) => part.type === "arm")?.rank ?? "C";
+    return Math.max(0.32, ROBOT_ATTACK_COOLDOWN_BASE - getRankIndex(headRank) * 0.15 - getRankIndex(armRank) * 0.08);
+  }
+
   function assembleRobot() {
     autoFillSelection();
     const selectedItems = getSelectedParts();
@@ -263,6 +306,12 @@ function createRobotsModule() {
       recoveryRemaining: 0,
       isRecovering: false,
       combatEnabled: true,
+      attackRange: computeAttackRange(consumedParts),
+      attackDamage: computeAttackDamage(consumedParts),
+      attackCooldown: computeAttackCooldown(consumedParts),
+      lastAttackAt: 0,
+      currentTargetId: null,
+      attackFlashUntil: 0,
     };
 
     gameState.gold -= goldCost;
@@ -331,20 +380,29 @@ function createRobotsModule() {
 
     robot.hp = Math.max(0, robot.hp - amount);
     if (robot.hp === 0) {
-      robot.isRecovering = true;
-      robot.combatEnabled = false;
-      robot.status = "recovering";
-      robot.recoveryRemaining = 6 + ROBOT_RANKS.indexOf(robot.rank) * 2;
-      robot.destination = { x: 96, y: 478, label: "Repair Bay" };
-      robotsState.pathSlots.forEach((slot) => {
-        slot.robotIds = slot.robotIds.filter((entry) => entry !== robot.id);
-      });
-      robot.slotId = null;
-      setWarning(`${robot.name} 파괴. 자동 회복 프로토콜 시작`);
+      startRobotRecovery(robot);
     }
 
     render();
     return true;
+  }
+
+  function startRobotRecovery(robot) {
+    if (!robot || robot.isRecovering) {
+      return;
+    }
+
+    robot.isRecovering = true;
+    robot.combatEnabled = false;
+    robot.status = "recovering";
+    robot.recoveryRemaining = 6 + ROBOT_RANKS.indexOf(robot.rank) * 2;
+    robot.destination = { x: 96, y: 478, label: "Repair Bay" };
+    robot.currentTargetId = null;
+    robotsState.pathSlots.forEach((slot) => {
+      slot.robotIds = slot.robotIds.filter((entry) => entry !== robot.id);
+    });
+    robot.slotId = null;
+    setWarning(`${robot.name} 파괴. 자동 회복 프로토콜 시작`);
   }
 
   function computeAuraTargets() {
@@ -369,23 +427,140 @@ function createRobotsModule() {
   }
 
   function syncPlacedRobots() {
-    gameState.placedRobots = robotsState.robots.map((robot) => ({
-      id: robot.id,
-      name: robot.name,
-      x: Math.round(robot.x),
-      y: Math.round(robot.y),
-      hp: robot.hp,
-      maxHP: robot.maxHP,
-      slotId: robot.slotId,
-      status: robot.status,
-      auraBonus: robot.auraBonus ?? 0,
-      rank: robot.rank,
-    }));
+    gameState.placedRobots = robotsState.robots.filter((robot) => robot.slotId && robot.combatEnabled && !robot.isRecovering);
+  }
+
+  function distanceBetween(a, b) {
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  }
+
+  function findNearestEnemy(robot, enemies) {
+    let target = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    const effectiveRange = robot.attackRange * (1 + (robot.auraBonus ?? 0));
+
+    for (const enemy of enemies) {
+      if (!enemy || enemy.hp <= 0 || enemy.isDead || enemy.dead) {
+        continue;
+      }
+
+      const enemyDistance = distanceBetween(robot, enemy);
+      if (enemyDistance <= effectiveRange && enemyDistance < bestDistance) {
+        target = enemy;
+        bestDistance = enemyDistance;
+      }
+    }
+
+    return target;
+  }
+
+  function applyDamageToEnemy(enemy, amount) {
+    if (!enemy || amount <= 0) {
+      return;
+    }
+
+    if (window.enemySystem?.damageEnemy) {
+      window.enemySystem.damageEnemy(enemy.id, amount);
+      return;
+    }
+
+    enemy.hp = Math.max(0, (enemy.hp ?? 0) - amount);
+    if (enemy.hp === 0) {
+      enemy.isDead = true;
+      enemy.dead = true;
+    }
+  }
+
+  function updateRobotCombat(nowSeconds) {
+    const enemies = Array.isArray(gameState.enemies) ? gameState.enemies : [];
+    if (enemies.length === 0) {
+      robotsState.robots.forEach((robot) => {
+        robot.currentTargetId = null;
+      });
+      return;
+    }
+
+    robotsState.robots.forEach((robot) => {
+      if (!robot.slotId || !robot.combatEnabled || robot.isRecovering || robot.status === "moving" || robot.status === "returning") {
+        robot.currentTargetId = null;
+        return;
+      }
+
+      const target = findNearestEnemy(robot, enemies);
+      if (!target) {
+        robot.currentTargetId = null;
+        return;
+      }
+
+      robot.currentTargetId = target.id;
+      if (nowSeconds - robot.lastAttackAt < robot.attackCooldown) {
+        return;
+      }
+
+      const totalDamage = Math.round(robot.attackDamage * (1 + (robot.auraBonus ?? 0)));
+      applyDamageToEnemy(target, totalDamage);
+      robot.lastAttackAt = nowSeconds;
+      robot.attackFlashUntil = performance.now() + ROBOT_ATTACK_FLASH_MS;
+      robot.status = "attacking";
+      gameState.message = `${robot.name}이(가) 적 로봇에 ${totalDamage} 피해를 입혔습니다.`;
+    });
+  }
+
+  function drawRobotSprites() {
+    const canvas = document.getElementById("game-canvas");
+    const ctx = canvas?.getContext("2d");
+    if (!ctx) {
+      return;
+    }
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+
+    for (const robot of robotsState.robots) {
+      if (!robot || typeof robot.x !== "number" || typeof robot.y !== "number") {
+        continue;
+      }
+
+      const drawX = Math.round(robot.x - ROBOT_SPRITE_SIZE / 2);
+      const drawY = Math.round(robot.y - ROBOT_SPRITE_SIZE / 2);
+      if (robotSpriteAsset.loaded) {
+        ctx.drawImage(robotSpriteAsset.image, drawX, drawY, ROBOT_SPRITE_SIZE, ROBOT_SPRITE_SIZE);
+      } else {
+        ctx.fillStyle = robot.isRecovering ? "#6b7280" : "#d7dde8";
+        ctx.fillRect(drawX, drawY, ROBOT_SPRITE_SIZE, ROBOT_SPRITE_SIZE);
+        ctx.fillStyle = "#ff6b2d";
+        ctx.fillRect(drawX + 10, drawY + 4, 12, 6);
+      }
+
+      ctx.fillStyle = "rgba(5, 7, 12, 0.72)";
+      ctx.fillRect(drawX, drawY - 8, ROBOT_SPRITE_SIZE, 4);
+      ctx.fillStyle = robot.isRecovering ? "#94a3b8" : "#7cff8f";
+      ctx.fillRect(drawX, drawY - 8, Math.round((robot.hp / robot.maxHP) * ROBOT_SPRITE_SIZE), 4);
+
+      if (robot.attackFlashUntil > performance.now() && robot.currentTargetId) {
+        const target = (gameState.enemies ?? []).find((enemy) => enemy.id === robot.currentTargetId);
+        if (target) {
+          ctx.strokeStyle = "rgba(255, 159, 107, 0.9)";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(Math.round(robot.x), Math.round(robot.y - 4));
+          ctx.lineTo(Math.round(target.x), Math.round(target.y));
+          ctx.stroke();
+        }
+      }
+    }
+
+    ctx.restore();
   }
 
   function updateRobots(deltaSeconds) {
+    const nowSeconds = performance.now() / 1000;
     robotsState.robots.forEach((robot) => {
       robot.auraBonus = 0;
+
+      if (!robot.isRecovering && robot.hp <= 0) {
+        startRobotRecovery(robot);
+      }
 
       const destination = robot.destination ?? { x: robot.x, y: robot.y };
       const dx = destination.x - robot.x;
@@ -395,7 +570,7 @@ function createRobotsModule() {
         const speed = robot.isRecovering ? 60 : 84;
         robot.x += (dx / distance) * speed * deltaSeconds;
         robot.y += (dy / distance) * speed * deltaSeconds;
-      } else if (robot.status === "moving" || robot.status === "returning") {
+      } else if (robot.status === "moving" || robot.status === "returning" || robot.status === "attacking") {
         robot.status = robot.slotId ? "defending" : "idle";
       }
 
@@ -412,6 +587,7 @@ function createRobotsModule() {
     });
 
     computeAuraTargets();
+    updateRobotCombat(nowSeconds);
     syncPlacedRobots();
   }
 
@@ -620,6 +796,7 @@ function createRobotsModule() {
     const deltaSeconds = Math.min(0.05, (timestamp - lastTick) / 1000);
     lastTick = timestamp;
     updateRobots(deltaSeconds);
+    drawRobotSprites();
     window.requestAnimationFrame(tick);
   }
 
