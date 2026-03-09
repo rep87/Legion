@@ -34,9 +34,7 @@ const heroState = {
   localItemId: 0,
 };
 
-if (!Array.isArray(hero.items)) {
-  hero.items = Array(HERO_SLOT_COUNT).fill(null);
-}
+hero.items = Array(HERO_SLOT_COUNT).fill(null);
 
 function createSpriteAsset(src) {
   const image = new Image();
@@ -78,26 +76,93 @@ function stripHeroBackdrop(image) {
   ctx.drawImage(image, 0, 0);
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const { data } = imageData;
+  const width = canvas.width;
+  const height = canvas.height;
+  const visited = new Uint8Array(width * height);
+  const queue = [];
 
-  for (let index = 0; index < data.length; index += 4) {
-    const red = data[index];
-    const green = data[index + 1];
-    const blue = data[index + 2];
-    const alpha = data[index + 3];
+  function getOffset(x, y) {
+    return (y * width + x) * 4;
+  }
+
+  function sampleColor(x, y) {
+    const offset = getOffset(x, y);
+    return {
+      r: data[offset],
+      g: data[offset + 1],
+      b: data[offset + 2],
+      a: data[offset + 3],
+    };
+  }
+
+  const backdropSamples = [
+    sampleColor(0, 0),
+    sampleColor(width - 1, 0),
+    sampleColor(0, height - 1),
+    sampleColor(width - 1, height - 1),
+  ];
+
+  function matchesBackdrop(x, y) {
+    const offset = getOffset(x, y);
+    const alpha = data[offset + 3];
     if (alpha === 0) {
+      return true;
+    }
+
+    const red = data[offset];
+    const green = data[offset + 1];
+    const blue = data[offset + 2];
+    const average = (red + green + blue) / 3;
+    const spread = Math.max(red, green, blue) - Math.min(red, green, blue);
+    const tolerance = average >= 205 ? 38 : 28;
+
+    return backdropSamples.some((sample) => {
+      if (sample.a === 0) {
+        return false;
+      }
+
+      const colorDistance = Math.abs(red - sample.r) + Math.abs(green - sample.g) + Math.abs(blue - sample.b);
+      return colorDistance <= tolerance && spread <= 32;
+    });
+  }
+
+  function enqueue(x, y) {
+    if (x < 0 || y < 0 || x >= width || y >= height) {
+      return;
+    }
+
+    const index = y * width + x;
+    if (visited[index]) {
+      return;
+    }
+
+    visited[index] = 1;
+    queue.push([x, y]);
+  }
+
+  for (let x = 0; x < width; x += 1) {
+    enqueue(x, 0);
+    enqueue(x, height - 1);
+  }
+
+  for (let y = 0; y < height; y += 1) {
+    enqueue(0, y);
+    enqueue(width - 1, y);
+  }
+
+  while (queue.length > 0) {
+    const [x, y] = queue.shift();
+    if (!matchesBackdrop(x, y)) {
       continue;
     }
 
-    const minChannel = Math.min(red, green, blue);
-    const maxChannel = Math.max(red, green, blue);
-    const channelSpread = maxChannel - minChannel;
-    const average = (red + green + blue) / 3;
-    const brightBackdrop = average >= 218 && channelSpread <= 20;
-    const nearWhiteBackdrop = red >= 228 && green >= 228 && blue >= 228;
+    const offset = getOffset(x, y);
+    data[offset + 3] = 0;
 
-    if (brightBackdrop || nearWhiteBackdrop) {
-      data[index + 3] = 0;
-    }
+    enqueue(x + 1, y);
+    enqueue(x - 1, y);
+    enqueue(x, y + 1);
+    enqueue(x, y - 1);
   }
 
   ctx.putImageData(imageData, 0, 0);
@@ -133,6 +198,10 @@ function nextLocalItemId() {
 function setHeroPosition(x, y) {
   heroState.x = clamp(x, 0, 800);
   heroState.y = clamp(y, 0, 600);
+}
+
+function clearHeroItems() {
+  hero.items = Array(HERO_SLOT_COUNT).fill(null);
 }
 
 function patchHeroPosition() {
@@ -391,17 +460,6 @@ function addItemToInventory(item) {
   return true;
 }
 
-function equipHeroItem(item) {
-  const emptyHeroSlot = hero.items.findIndex((slot) => slot === null);
-  if (emptyHeroSlot === -1) {
-    return false;
-  }
-
-  hero.items[emptyHeroSlot] = item;
-  renderHeroSlots();
-  return true;
-}
-
 function resolveDroppedItemPosition(item) {
   return {
     x: Number.isFinite(item && item.x) ? item.x : Number.isFinite(item && item.position && item.position.x) ? item.position.x : 0,
@@ -412,7 +470,7 @@ function resolveDroppedItemPosition(item) {
 function collectGold(item) {
   const goldAmount = Math.max(0, Number(item?.amount) || 0);
   gameState.gold = (gameState.gold || 0) + goldAmount;
-  setStatus(`°ñµå ${goldAmount} È¹µæ.`);
+  setStatus(`ê³¨ë“œ ${goldAmount} íšë“.`);
   syncInventoryDisplay();
   return true;
 }
@@ -421,7 +479,7 @@ function lootItem(item, index) {
   const position = resolveDroppedItemPosition(item);
   const distance = Math.hypot(heroState.x - position.x, heroState.y - position.y);
   if (distance > HERO_LOOT_RANGE) {
-    setStatus("¾ÆÀÌÅÛÀÌ ³Ê¹« ¸Ù´Ï´Ù.");
+    setStatus("ì•„ì´í…œì´ ë„ˆë¬´ ë©‰ë‹ˆë‹¤.");
     return false;
   }
 
@@ -432,20 +490,19 @@ function lootItem(item, index) {
   }
 
   if (!inventoryHasSpace()) {
-    setStatus("ÀÎº¥Åä¸®°¡ ²Ë Ã¡½À´Ï´Ù");
+    setStatus("ì¸ë²¤í† ë¦¬ê°€ ê½‰ ì°¼ìŠµë‹ˆë‹¤.");
     return false;
   }
 
   const inventoryItem = normalizeInventoryItem(item && item.payload ? item.payload : item);
-  const equipped = equipHeroItem(inventoryItem);
   const added = addItemToInventory(inventoryItem);
   if (!added) {
-    setStatus("ÀÎº¥Åä¸®°¡ ²Ë Ã¡½À´Ï´Ù");
+    setStatus("ì¸ë²¤í† ë¦¬ê°€ ê½‰ ì°¼ìŠµë‹ˆë‹¤.");
     return false;
   }
 
   gameState.droppedItems.splice(index, 1);
-  setStatus(equipped ? `${formatItemLabel(inventoryItem)} ÀåÂø ¹× È¸¼ö ¿Ï·á.` : `${formatItemLabel(inventoryItem)} È¸¼ö ¿Ï·á.`);
+  setStatus(`${formatItemLabel(inventoryItem)} íšŒìˆ˜ ì™„ë£Œ.`);
   renderHeroSlots();
   syncInventoryDisplay();
   return true;
@@ -521,7 +578,7 @@ function performAttack(options = {}) {
   const target = findAttackTarget();
   if (!target) {
     if (!silent) {
-      setStatus("±ÙÁ¢ °ø°İ ¹üÀ§¿¡ ÀûÀÌ ¾ø½À´Ï´Ù.");
+      setStatus("ê·¼ì ‘ ê³µê²© ë²”ìœ„ì— ì ì´ ì—†ìŠµë‹ˆë‹¤.");
     }
     return false;
   }
@@ -529,7 +586,7 @@ function performAttack(options = {}) {
   heroState.attackCooldown = HERO_ATTACK_COOLDOWN;
   damageEnemy(target, HERO_ATTACK_DAMAGE);
   pruneDeadEnemies();
-  setStatus(automatic ? `ÀÚµ¿ °ø°İ ÀûÁß: ${HERO_ATTACK_DAMAGE} ÇÇÇØ.` : `±ÙÁ¢ °ø°İ ÀûÁß: ${HERO_ATTACK_DAMAGE} ÇÇÇØ.`);
+  setStatus(automatic ? `ìë™ ê³µê²© ì ì¤‘: ${HERO_ATTACK_DAMAGE} í”¼í•´.` : `ê·¼ì ‘ ê³µê²© ì ì¤‘: ${HERO_ATTACK_DAMAGE} í”¼í•´.`);
   return true;
 }
 
@@ -719,6 +776,7 @@ function initHeroSystem() {
   }
 
   heroState.initialized = true;
+  clearHeroItems();
   patchHeroPosition();
   bindHeroControls();
   renderHeroSlots();
@@ -739,3 +797,4 @@ window.heroSystem = {
   attack: performAttack,
   lootItem,
 };
+

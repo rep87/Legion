@@ -169,20 +169,20 @@ function formatEnemyDebugLabel(enemy) {
 
 function formatPartTypeLabel(partType) {
   return {
-    arm: "팔",
-    leg: "다리",
-    head: "머리",
-    body: "몸통",
+    arm: "??,
+    leg: "?ㅻ━",
+    head: "癒몃━",
+    body: "紐명넻",
   }[partType] || partType;
 }
 
 function buildDropDebugMessage(enemy, droppedParts) {
   if (!droppedParts.length) {
-    return `${formatEnemyDebugLabel(enemy)} 처치 -> 드롭 없음`;
+    return `${formatEnemyDebugLabel(enemy)} 泥섏튂 -> ?쒕∼ ?놁쓬`;
   }
 
   const firstDrop = droppedParts[0];
-  return `${formatEnemyDebugLabel(enemy)} 처치 -> ${formatPartTypeLabel(firstDrop.partType)}(${firstDrop.grade}) 드롭`;
+  return `${formatEnemyDebugLabel(enemy)} 泥섏튂 -> ${formatPartTypeLabel(firstDrop.partType)}(${firstDrop.grade}) ?쒕∼`;
 }
 
 function getPathForRegion(region) {
@@ -554,7 +554,7 @@ function drawDroppedItemSprites(ctx, gameState) {
     const drawY = Math.round(item.y - DROP_ICON_DRAW_SIZE / 2);
 
     if (asset?.loaded) {
-      ctx.drawImage(asset.image, drawX, drawY, DROP_ICON_DRAW_SIZE, DROP_ICON_DRAW_SIZE);
+      ctx.drawImage(asset.renderSource, drawX, drawY, DROP_ICON_DRAW_SIZE, DROP_ICON_DRAW_SIZE);
       continue;
     }
 
@@ -589,7 +589,7 @@ function drawEnemySprites() {
     const size = enemy.isBoss ? BOSS_SPRITE_DRAW_SIZE : ENEMY_SPRITE_DRAW_SIZE;
     const drawX = Math.round(enemy.x - size / 2);
     const drawY = Math.round(enemy.y - size / 2);
-    ctx.drawImage(asset.image, drawX, drawY, size, size);
+    ctx.drawImage(asset.renderSource, drawX, drawY, size, size);
   }
 
   ctx.textAlign = "center";
@@ -693,3 +693,4 @@ if (document.readyState === "loading") {
 } else {
   initEnemyVisuals();
 }
+
