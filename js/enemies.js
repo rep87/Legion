@@ -6,6 +6,8 @@ const GRADE_TABLE = [
   { grade: "S", weight: 0.03 },
 ];
 const DROP_LIFETIME_MS = 30000;
+const DEBUG_PART_DROP_RATE = 1;
+const DEBUG_DROP_LOG_DURATION_MS = 3000;
 const BASE_REACH_RADIUS = 12;
 const ROBOT_THREAT_RADIUS = 92;
 const ENEMY_SPRITE_DRAW_SIZE = 32;
@@ -65,6 +67,9 @@ const enemySpriteAssets = Object.fromEntries(
 const enemyVisualState = {
   initialized: false,
 };
+const dropDebugState = {
+  timeoutId: null,
+};
 
 function getGameState() {
   return window.gameState;
@@ -87,6 +92,86 @@ function pickWeightedGrade() {
 
 function clonePoint(point) {
   return { x: point.x, y: point.y };
+}
+
+function ensureDropDebugOverlay() {
+  let overlay = document.getElementById("drop-debug-log");
+  if (overlay) {
+    return overlay;
+  }
+
+  if (!document.getElementById("drop-debug-style")) {
+    const style = document.createElement("style");
+    style.id = "drop-debug-style";
+    style.textContent = `
+      #drop-debug-log {
+        position: fixed;
+        top: 18px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 40;
+        min-width: 280px;
+        max-width: min(90vw, 680px);
+        padding: 10px 14px;
+        border: 1px solid rgba(255, 107, 45, 0.7);
+        background: rgba(8, 12, 18, 0.92);
+        color: #e7edf7;
+        font: 13px "Courier New", monospace;
+        text-align: center;
+        box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 120ms ease;
+      }
+      #drop-debug-log[data-visible="true"] {
+        opacity: 1;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  overlay = document.createElement("div");
+  overlay.id = "drop-debug-log";
+  overlay.setAttribute("data-visible", "false");
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+function showDropDebugLog(message) {
+  const overlay = ensureDropDebugOverlay();
+  overlay.textContent = message;
+  overlay.setAttribute("data-visible", "true");
+
+  if (dropDebugState.timeoutId) {
+    window.clearTimeout(dropDebugState.timeoutId);
+  }
+
+  dropDebugState.timeoutId = window.setTimeout(() => {
+    overlay.setAttribute("data-visible", "false");
+    dropDebugState.timeoutId = null;
+  }, DEBUG_DROP_LOG_DURATION_MS);
+}
+
+function formatEnemyDebugLabel(enemy) {
+  return `enemy_${String(enemy.grade || "c").toLowerCase()}`;
+}
+
+function formatPartTypeLabel(partType) {
+  return {
+    arm: "팔",
+    leg: "다리",
+    head: "머리",
+    body: "몸통",
+  }[partType] || partType;
+}
+
+function buildDropDebugMessage(enemy, droppedParts) {
+  if (!droppedParts.length) {
+    return `${formatEnemyDebugLabel(enemy)} 처치 -> 드롭 없음`;
+  }
+
+  const firstDrop = droppedParts[0];
+  return `${formatEnemyDebugLabel(enemy)} 처치 -> ${formatPartTypeLabel(firstDrop.partType)}(${firstDrop.grade}) 드롭`;
 }
 
 function getPathForRegion(region) {
@@ -183,18 +268,20 @@ function createItemDrop(x, y, kind, amount = 1, extra = {}) {
 
 function dropLoot(enemy) {
   const gameState = getGameState();
-  const partDropCount = 1 + Math.floor(Math.random() * 2);
+  const droppedParts = [];
+  const shouldDropPart = Math.random() < DEBUG_PART_DROP_RATE;
+  const partDropCount = shouldDropPart ? 1 + Math.floor(Math.random() * 2) : 0;
 
   for (let index = 0; index < partDropCount; index += 1) {
     const partType = PART_TYPES[Math.floor(Math.random() * PART_TYPES.length)];
     const grade = pickWeightedGrade();
-    gameState.droppedItems.push(
-      createItemDrop(enemy.x + index * 10, enemy.y - index * 4, "part", 1, {
-        icon: grade,
-        grade,
-        partType,
-      })
-    );
+    const drop = createItemDrop(enemy.x + index * 10, enemy.y - index * 4, "part", 1, {
+      icon: grade,
+      grade,
+      partType,
+    });
+    droppedParts.push(drop);
+    gameState.droppedItems.push(drop);
   }
 
   gameState.droppedItems.push(
@@ -202,6 +289,8 @@ function dropLoot(enemy) {
       icon: "G",
     })
   );
+
+  showDropDebugLog(buildDropDebugMessage(enemy, droppedParts));
 }
 
 function damageBaseFromEnemy(enemy) {
