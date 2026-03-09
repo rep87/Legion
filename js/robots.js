@@ -44,13 +44,21 @@ function createRobotsModule() {
     const style = document.createElement("style");
     style.id = styleId;
     style.textContent = `
+      #robots-module-root {
+        display: grid;
+        grid-template-columns: minmax(260px, 320px) minmax(300px, 1fr);
+        gap: 16px;
+        min-height: 100%;
+      }
+      .robot-column {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
       .robot-panel {
         border: 1px solid #243246;
         background: linear-gradient(180deg, rgba(22, 31, 45, 0.92), rgba(10, 14, 22, 0.92));
         padding: 12px;
-      }
-      .robot-panel + .robot-panel {
-        margin-top: 12px;
       }
       .robot-subtitle {
         margin: 0 0 10px;
@@ -58,7 +66,9 @@ function createRobotsModule() {
         color: #ff9f6b;
         text-transform: uppercase;
       }
-      .robot-parts {
+      .robot-parts,
+      .robot-list,
+      .robot-systems {
         display: grid;
         gap: 8px;
       }
@@ -91,9 +101,7 @@ function createRobotsModule() {
         margin-top: 10px;
       }
       .robot-list {
-        display: grid;
-        gap: 8px;
-        max-height: 280px;
+        max-height: 420px;
         overflow: auto;
       }
       .robot-dropzone {
@@ -114,12 +122,25 @@ function createRobotsModule() {
         display: grid;
         gap: 6px;
       }
+      .robot-inline-select {
+        width: 100%;
+        margin-top: 10px;
+        background: #0b1119;
+        color: #e7edf7;
+        border: 1px solid #243246;
+        padding: 8px;
+      }
+      @media (max-width: 1180px) {
+        #robots-module-root {
+          grid-template-columns: 1fr;
+        }
+      }
     `;
     document.head.appendChild(style);
   }
 
-  const sidebar = document.querySelector(".sidebar");
-  if (!sidebar) {
+  const layoutMount = document.getElementById("robot-layout");
+  if (!layoutMount) {
     return null;
   }
 
@@ -127,7 +148,7 @@ function createRobotsModule() {
   if (!mount) {
     mount = document.createElement("section");
     mount.id = "robots-module-root";
-    sidebar.appendChild(mount);
+    layoutMount.appendChild(mount);
   }
 
   function setWarning(message) {
@@ -271,12 +292,6 @@ function createRobotsModule() {
       return false;
     }
 
-    if (slot.turretCount >= 1 && slot.robotIds.length >= 3) {
-      setWarning(`${slot.label} 위치 제한을 초과했습니다.`);
-      render();
-      return false;
-    }
-
     robotsState.pathSlots.forEach((pathSlot) => {
       pathSlot.robotIds = pathSlot.robotIds.filter((entry) => entry !== robot.id);
     });
@@ -411,7 +426,7 @@ function createRobotsModule() {
     }
 
     if (!canDisassemble(robot)) {
-      setWarning("분해는 기지 귀환 후에만 가능합니다.");
+      setWarning("분해는 기지 귀환 상태에서만 가능합니다.");
       render();
       return false;
     }
@@ -483,14 +498,14 @@ function createRobotsModule() {
     const rows = robotsState.pathSlots.map((slot) => `
       <div class="robot-slot-row">
         <strong>${slot.label}</strong>
-        <div class="robot-meta">로봇 ${slot.robotIds.length}/3 · 포탑 ${slot.turretCount}/1</div>
+        <div class="robot-meta">로봇 ${slot.robotIds.length}/3, 포탑 ${slot.turretCount}/1</div>
       </div>
     `).join("");
 
     return `
       <section class="robot-panel">
         <h3 class="robot-subtitle">Path Slots</h3>
-        ${rows}
+        <div class="robot-systems">${rows}</div>
       </section>
     `;
   }
@@ -504,10 +519,10 @@ function createRobotsModule() {
 
     return `
       <article class="robot-card">
-        <strong>${robot.name} · ${robot.rank}</strong>
-        <div class="robot-meta">HP ${Math.round(robot.hp)}/${robot.maxHP} · 상태 ${robot.status}</div>
-        <div class="robot-meta">위치 ${Math.round(robot.x)}, ${Math.round(robot.y)} · 오라 +${Math.round((robot.auraBonus ?? 0) * 100)}%</div>
-        <div class="robot-meta">대상 ${robot.destination?.label ?? "Base"} · 인접 버프 ${robot.auraTargets.length}기</div>
+        <strong>${robot.name} / ${robot.rank}</strong>
+        <div class="robot-meta">HP ${Math.round(robot.hp)}/${robot.maxHP} / 상태 ${robot.status}</div>
+        <div class="robot-meta">위치 ${Math.round(robot.x)}, ${Math.round(robot.y)} / 오라 +${Math.round((robot.auraBonus ?? 0) * 100)}%</div>
+        <div class="robot-meta">목표 ${robot.destination?.label ?? "Base"} / 버프 대상 ${robot.auraTargets.length}기</div>
         <div class="robot-commands">
           ${commandButtons}
           <button type="button" data-action="return-robot" data-robot-id="${robot.id}">기지 귀환</button>
@@ -527,7 +542,7 @@ function createRobotsModule() {
       <section class="robot-panel">
         <h3 class="robot-subtitle">Disassembly</h3>
         <div class="robot-meta">로봇을 기지로 귀환시킨 뒤 분해 키트를 드래그해 넣습니다.</div>
-        <select id="robot-disassembly-target" style="width:100%;margin-top:10px;background:#0b1119;color:#e7edf7;border:1px solid #243246;padding:8px;">
+        <select id="robot-disassembly-target" class="robot-inline-select">
           ${robotOptions}
         </select>
         <div class="robot-dropzone" id="robot-disassembly-dropzone">분해 키트를 여기로 드래그</div>
@@ -552,10 +567,14 @@ function createRobotsModule() {
   function render() {
     autoFillSelection();
     mount.innerHTML = `
-      ${renderPartsPanel()}
-      ${renderSlotsPanel()}
-      ${renderDisassemblyPanel()}
-      ${renderRosterPanel()}
+      <section class="robot-column robot-column-primary">
+        ${renderPartsPanel()}
+      </section>
+      <section class="robot-column robot-column-secondary">
+        ${renderSlotsPanel()}
+        ${renderDisassemblyPanel()}
+        ${renderRosterPanel()}
+      </section>
     `;
 
     mount.querySelectorAll("[data-action='select-part']").forEach((button) => {
