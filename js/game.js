@@ -157,6 +157,7 @@ function resetBattle() {
   gameState.elapsedInWave = 0;
   gameState.message = "전장을 초기화했습니다. A지역 1웨이브부터 다시 시작합니다.";
   gameState.fogOfWar = [{ x: 320, y: 220, radius: 140 }];
+  delete gameState.mapData;
 }
 
 function damageBase(amount) {
@@ -171,12 +172,12 @@ function damageBase(amount) {
 function usePower(amount) {
   const nextUsage = gameState.usedPower + amount;
   if (nextUsage > gameState.maxPower) {
-    gameState.message = "?꾨젰??遺議깊빀?덈떎. 異붽? 濡쒕큸 諛곗튂??遺덇??⑸땲??";
+    gameState.message = "전력이 부족합니다. 추가 로봇 배치는 불가합니다.";
     return;
   }
 
   gameState.usedPower = nextUsage;
-  gameState.message = `${amount} ?꾨젰???뚮え?덉뒿?덈떎. ?꾩옱 諛곗튂 ?꾨젰 ${gameState.usedPower}/${gameState.maxPower}.`;
+  gameState.message = `${amount} 전력을 소모했습니다. 현재 배치 전력 ${gameState.usedPower}/${gameState.maxPower}.`;
 }
 
 function update(deltaSeconds) {
@@ -189,11 +190,6 @@ function update(deltaSeconds) {
       completeWave();
     }
   }
-
-  const moveRadius = 120;
-  const orbit = performance.now() * 0.00025;
-  gameState.hero.x = 400 + Math.cos(orbit) * moveRadius;
-  gameState.hero.y = 300 + Math.sin(orbit * 1.3) * 70;
 
   clampState();
   updateHUD();
@@ -317,9 +313,33 @@ function frame(timestamp) {
   window.requestAnimationFrame(frame);
 }
 
+function focusElement(selector) {
+  const element = document.querySelector(selector);
+  if (!element) {
+    return;
+  }
+
+  element.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  if (typeof element.focus === "function") {
+    element.focus({ preventScroll: true });
+  }
+}
+
 function bindUI() {
   document.getElementById("start-wave-button").addEventListener("click", () => {
     beginWave();
+  });
+
+  document.getElementById("focus-battlefield-button")?.addEventListener("click", () => {
+    focusElement("#game-canvas");
+  });
+
+  document.getElementById("focus-fabricator-button")?.addEventListener("click", () => {
+    focusElement("#robots-module-root");
+  });
+
+  document.getElementById("focus-inventory-button")?.addEventListener("click", () => {
+    focusElement("#inventory-panel");
   });
 
   document.getElementById("damage-base-button").addEventListener("click", () => {
@@ -374,4 +394,3 @@ updateHUD();
 bindUI();
 render();
 window.requestAnimationFrame(frame);
-

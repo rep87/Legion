@@ -110,6 +110,14 @@ function ensureMapState() {
     };
   }
 
+  for (const zone of gameState.fogOfWar) {
+    if (!zone || typeof zone.x !== "number" || typeof zone.y !== "number" || typeof zone.radius !== "number") {
+      continue;
+    }
+
+    gameState.mapData.revealedZoneKeys[buildRevealKey(zone.x, zone.y, zone.radius, zone.source || "legacy")] = true;
+  }
+
   for (const region of Object.keys(SLOT_LAYOUTS)) {
     if (!gameState.mapData.slotsByRegion[region]) {
       gameState.mapData.slotsByRegion[region] = getRegionSlots(region).map((slot) => ({
@@ -558,6 +566,7 @@ function renderScene(ctx) {
   drawEnemies(ctx, gameState);
   drawHero(ctx, gameState);
   drawFog(ctx, gameState);
+  drawPath(ctx, gameState, theme);
   drawMinimap(ctx, gameState);
 }
 

@@ -79,7 +79,8 @@
     }
 
     .sidebar,
-    .inventory {
+    .inventory,
+    .utility-panel {
       background: linear-gradient(180deg, rgba(16, 23, 34, 0.98), rgba(9, 13, 20, 0.98));
       border: 1px solid var(--line);
     }
@@ -90,6 +91,24 @@
       display: flex;
       flex-direction: column;
       gap: 16px;
+    }
+
+    .main-column {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      align-items: flex-end;
+    }
+
+    .utility-panel {
+      width: 100%;
+      padding: 12px;
+    }
+
+    .utility-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
     }
 
     .panel-title {
@@ -112,6 +131,10 @@
       gap: 10px;
     }
 
+    .button-grid.command-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     button {
       width: 100%;
       border: 1px solid #7a3116;
@@ -121,6 +144,7 @@
       font: inherit;
       cursor: pointer;
       text-align: left;
+      min-height: 64px;
     }
 
     button:hover {
@@ -187,7 +211,7 @@
     }
 
     .inventory {
-      margin-top: 16px;
+      width: 800px;
       padding: 12px 16px 16px;
     }
 
@@ -226,10 +250,20 @@
         min-height: auto;
       }
 
+      .main-column {
+        align-items: stretch;
+      }
+
       .canvas-wrap,
-      canvas {
+      canvas,
+      .inventory {
         width: 100%;
         height: auto;
+      }
+
+      .utility-grid,
+      .button-grid.command-grid {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -262,22 +296,22 @@
           <p class="panel-copy">A지역 폐허 기지를 유지하며 웨이브를 막습니다. 전력과 기지 체력은 상단 HUD와 연동됩니다.</p>
         </section>
 
-        <section class="button-grid">
+        <section class="button-grid command-grid">
           <button id="start-wave-button" type="button">
             다음 웨이브 가동
             <span class="button-caption">현재 지역에서 전투를 시작합니다.</span>
           </button>
-          <button id="damage-base-button" type="button">
-            기지 피해 테스트
-            <span class="button-caption">기지 HP UI 반응 확인용입니다.</span>
+          <button id="focus-battlefield-button" type="button">
+            전장 포커스
+            <span class="button-caption">캔버스로 이동해 영웅 조작을 이어갑니다.</span>
           </button>
-          <button id="use-power-button" type="button">
-            전력 사용 테스트
-            <span class="button-caption">로봇 배치 전력 소모 UI 확인용입니다.</span>
+          <button id="focus-fabricator-button" type="button">
+            조립 패널로
+            <span class="button-caption">로봇 조립 UI 위치로 스크롤합니다.</span>
           </button>
-          <button id="reset-battle-button" type="button">
-            전장 초기화
-            <span class="button-caption">현재 지역과 수치를 기본값으로 되돌립니다.</span>
+          <button id="focus-inventory-button" type="button">
+            인벤토리 확인
+            <span class="button-caption">캔버스 아래 9칸 인벤토리로 이동합니다.</span>
           </button>
         </section>
 
@@ -293,28 +327,48 @@
         </section>
       </aside>
 
-      <section class="canvas-wrap">
-        <canvas id="game-canvas" width="800" height="600" aria-label="IRON FRONTIER battlefield"></canvas>
-        <div class="status-line" id="status-line">대기 중. 다음 웨이브 가동 버튼으로 전투를 시작합니다.</div>
-        <div class="minimap-slot" id="minimap-slot">
-          <span class="minimap-label">Minimap Reserved</span>
-        </div>
-      </section>
-    </section>
+      <section class="main-column">
+        <section class="utility-panel">
+          <h2 class="panel-title">Debug Controls</h2>
+          <div class="utility-grid">
+            <button id="damage-base-button" type="button">
+              기지 피해 테스트
+              <span class="button-caption">기지 HP UI 반응을 확인합니다.</span>
+            </button>
+            <button id="use-power-button" type="button">
+              전력 사용 테스트
+              <span class="button-caption">전력 소모 후 상태 문구를 확인합니다.</span>
+            </button>
+            <button id="reset-battle-button" type="button">
+              전장 초기화
+              <span class="button-caption">기지 수치와 시야를 기본 상태로 되돌립니다.</span>
+            </button>
+          </div>
+        </section>
 
-    <section class="inventory">
-      <h2 class="panel-title">Inventory</h2>
-      <div class="inventory-grid" id="inventory-grid">
-        <div class="slot">1</div>
-        <div class="slot">2</div>
-        <div class="slot">3</div>
-        <div class="slot">4</div>
-        <div class="slot">5</div>
-        <div class="slot">6</div>
-        <div class="slot">7</div>
-        <div class="slot">8</div>
-        <div class="slot">9</div>
-      </div>
+        <section class="canvas-wrap">
+          <canvas id="game-canvas" width="800" height="600" aria-label="IRON FRONTIER battlefield"></canvas>
+          <div class="status-line" id="status-line">대기 중. 다음 웨이브 가동 버튼으로 전투를 시작합니다.</div>
+          <div class="minimap-slot" id="minimap-slot">
+            <span class="minimap-label">Minimap Reserved</span>
+          </div>
+        </section>
+
+        <section class="inventory" id="inventory-panel">
+          <h2 class="panel-title">Inventory</h2>
+          <div class="inventory-grid" id="inventory-grid">
+            <div class="slot">1</div>
+            <div class="slot">2</div>
+            <div class="slot">3</div>
+            <div class="slot">4</div>
+            <div class="slot">5</div>
+            <div class="slot">6</div>
+            <div class="slot">7</div>
+            <div class="slot">8</div>
+            <div class="slot">9</div>
+          </div>
+        </section>
+      </section>
     </section>
   </main>
 

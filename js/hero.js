@@ -212,8 +212,11 @@ function signalFogUpdate(force) {
     radius: HERO_SIGHT_RADIUS,
     source: "hero",
   };
-
-  gameState.fogOfWar.push(reveal);
+  if (window.mapSystem?.revealArea) {
+    window.mapSystem.revealArea(reveal.x, reveal.y, reveal.radius, `hero:manual:${reveal.x}:${reveal.y}`);
+  } else {
+    gameState.fogOfWar.push(reveal);
+  }
   heroState.lastFogSignalX = heroState.x;
   heroState.lastFogSignalY = heroState.y;
 
