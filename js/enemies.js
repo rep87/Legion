@@ -321,7 +321,7 @@ function damageBaseFromEnemy(enemy) {
 
   enemy.reachedBase = true;
   gameState.baseHP = Math.max(0, gameState.baseHP - enemy.attack);
-  gameState.message = `${enemy.bossType === "region" ? "\uC9C0\uC5ED \uBCF4\uC2A4" : "\uC6E8\uC774\uBE0C \uBCF4\uC2A4"}\uAC00 \uC544\uAD70 \uB85C\uBD07\uC5D0 ${enemy.attack} \uD53C\uD574\uB97C \uC785\uD614\uC2B5\uB2C8\uB2E4.`;
+  gameState.message = `${enemy.bossType === "region" ? "\uC9C0\uC5ED \uBCF4\uC2A4" : enemy.isBoss ? "\uBCF4\uC2A4" : "\uC801 \uB85C\uBD07"}\uAC00 \uAE30\uC9C0\uC5D0 ${enemy.attack} \uD53C\uD574\uB97C \uC785\uD614\uC2B5\uB2C8\uB2E4.`;
 }
 
 function maybeDamageRobot(enemy, now) {
@@ -364,7 +364,7 @@ function maybeDamageRobot(enemy, now) {
   }
 
   enemy.lastRobotHitAt = now;
-  gameState.message = `${enemy.bossType === "region" ? "지역 보스" : "웨이브 보스"}가 아군 로봇에 ${enemy.attack} 피해를 입혔습니다.`;
+  gameState.message = `${enemy.bossType === "region" ? "\uC9C0\uC5ED \uBCF4\uC2A4" : "\uC6E8\uC774\uBE0C \uBCF4\uC2A4"}\uAC00 \uC544\uAD70 \uB85C\uBD07\uC5D0 ${enemy.attack} \uD53C\uD574\uB97C \uC785\uD614\uC2B5\uB2C8\uB2E4.`;
 }
 
 function removeExpiredDrops(now = performance.now()) {
@@ -422,14 +422,14 @@ function triggerRegionTransition(region) {
     gameState.wave = 1;
     gameState.isBossWave = false;
     gameState.waveActive = false;
-    gameState.message = "B\uC9C0\uC5ED \uC9C0\uC5ED \uBCF4\uC2A4\uB97C \uACA9\uD30C\uD588\uC2B5\uB2C8\uB2E4. \uD604\uC7AC \uAD6C\uD604 \uBC94\uC704\uC5D0\uC11C \uBAA8\uB4E0 \uC9C0\uC5ED\uC774 \uC815\uB9AC\uB418\uC5C8\uC2B5\uB2C8\uB2E4.";
+    gameState.message = "A\uC9C0\uC5ED \uC9C0\uC5ED \uBCF4\uC2A4 \uACA9\uD30C. B\uC9C0\uC5ED \uC804\uD658 \uD2B8\uB9AC\uAC70\uAC00 \uD65C\uC131\uD654\uB418\uC5C8\uC2B5\uB2C8\uB2E4.";
     return;
   }
 
   gameState.regions.B.cleared = true;
   gameState.regions.B.bossDefeated = true;
   gameState.waveActive = false;
-  gameState.message = "B지역 지역 보스를 격파했습니다. 현재 구현 범위에서 모든 지역이 정리되었습니다.";
+  gameState.message = "B\uC9C0\uC5ED \uC9C0\uC5ED \uBCF4\uC2A4\uB97C \uACA9\uD30C\uD588\uC2B5\uB2C8\uB2E4. \uD604\uC7AC \uAD6C\uD604 \uBC94\uC704\uC5D0\uC11C \uBAA8\uB4E0 \uC9C0\uC5ED\uC774 \uC815\uB9AC\uB418\uC5C8\uC2B5\uB2C8\uB2E4.";
 }
 
 function handleEnemyDeath(enemy) {

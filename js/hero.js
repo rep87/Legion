@@ -470,7 +470,7 @@ function resolveDroppedItemPosition(item) {
 function collectGold(item) {
   const goldAmount = Math.max(0, Number(item?.amount) || 0);
   gameState.gold = (gameState.gold || 0) + goldAmount;
-  setStatus(`골드 ${goldAmount} 획득.`);
+  setStatus(`\uACE8\uB4DC ${goldAmount} \uD68D\uB4DD.`);
   syncInventoryDisplay();
   return true;
 }
@@ -479,7 +479,7 @@ function lootItem(item, index) {
   const position = resolveDroppedItemPosition(item);
   const distance = Math.hypot(heroState.x - position.x, heroState.y - position.y);
   if (distance > HERO_LOOT_RANGE) {
-    setStatus("아이템이 너무 멉니다.");
+    setStatus("\uC544\uC774\uD15C\uC774 \uB108\uBB34 \uBA49\uB2C8\uB2E4.");
     return false;
   }
 
@@ -490,19 +490,19 @@ function lootItem(item, index) {
   }
 
   if (!inventoryHasSpace()) {
-    setStatus("인벤토리가 꽉 찼습니다.");
+    setStatus("\uC778\uBCA4\uD1A0\uB9AC\uAC00 \uAF49 \uCC3C\uC2B5\uB2C8\uB2E4.");
     return false;
   }
 
   const inventoryItem = normalizeInventoryItem(item && item.payload ? item.payload : item);
   const added = addItemToInventory(inventoryItem);
   if (!added) {
-    setStatus("인벤토리가 꽉 찼습니다.");
+    setStatus("\uC778\uBCA4\uD1A0\uB9AC\uAC00 \uAF49 \uCC3C\uC2B5\uB2C8\uB2E4.");
     return false;
   }
 
   gameState.droppedItems.splice(index, 1);
-  setStatus(`${formatItemLabel(inventoryItem)} 회수 완료.`);
+  setStatus(`${formatItemLabel(inventoryItem)} \uD68C\uC218 \uC644\uB8CC.`);
   renderHeroSlots();
   syncInventoryDisplay();
   return true;
@@ -578,7 +578,7 @@ function performAttack(options = {}) {
   const target = findAttackTarget();
   if (!target) {
     if (!silent) {
-      setStatus("근접 공격 범위에 적이 없습니다.");
+      setStatus("\uADFC\uC811 \uACF5\uACA9 \uBC94\uC704\uC5D0 \uC801\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.");
     }
     return false;
   }
@@ -586,7 +586,7 @@ function performAttack(options = {}) {
   heroState.attackCooldown = HERO_ATTACK_COOLDOWN;
   damageEnemy(target, HERO_ATTACK_DAMAGE);
   pruneDeadEnemies();
-  setStatus(automatic ? `자동 공격 적중: ${HERO_ATTACK_DAMAGE} 피해.` : `근접 공격 적중: ${HERO_ATTACK_DAMAGE} 피해.`);
+  setStatus(automatic ? `\uC790\uB3D9 \uACF5\uACA9 \uC801\uC911: ${HERO_ATTACK_DAMAGE} \uD53C\uD574.` : `\uADFC\uC811 \uACF5\uACA9 \uC801\uC911: ${HERO_ATTACK_DAMAGE} \uD53C\uD574.`);
   return true;
 }
 
