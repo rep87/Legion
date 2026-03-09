@@ -10,12 +10,20 @@ const INVENTORY_RANK_COLORS = {
 
 function createInventoryModule() {
   const gameState = window.gameState ?? {};
-  const inventoryState = gameState.inventory ?? {
-    slots: new Array(INVENTORY_SLOT_COUNT).fill(null),
-    combineOffer: null,
-    warning: "",
-    lastItemId: 0,
-  };
+  const existingInventory = gameState.inventory;
+  const inventoryState = Array.isArray(existingInventory)
+    ? {
+        slots: existingInventory,
+        combineOffer: null,
+        warning: "",
+        lastItemId: 0,
+      }
+    : existingInventory ?? {
+        slots: new Array(INVENTORY_SLOT_COUNT).fill(null),
+        combineOffer: null,
+        warning: "",
+        lastItemId: 0,
+      };
 
   gameState.inventory = inventoryState;
   window.gameState = gameState;

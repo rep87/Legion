@@ -1,4 +1,4 @@
-﻿const PART_TYPES = ["arm", "leg", "head", "body"];
+const PART_TYPES = ["arm", "leg", "head", "body"];
 const GRADE_TABLE = [
   { grade: "C", weight: 0.6 },
   { grade: "B", weight: 0.25 },
@@ -58,8 +58,6 @@ function clonePoint(point) {
 
 function getPathForRegion(region) {
   const gameState = getGameState();
-
-  // TODO(game.js): expose canonical path data on gameState so enemies do not mirror path geometry here.
   if (gameState && gameState.paths && Array.isArray(gameState.paths[region])) {
     return gameState.paths[region].map(clonePoint);
   }
@@ -421,6 +419,3 @@ const enemySystem = {
 };
 
 window.enemySystem = enemySystem;
-
-// TODO(game.js): import this module and call `enemySystem.syncWaveSpawns()`, `enemySystem.update(deltaSeconds)`,
-// and `enemySystem.draw(ctx)` from the main loop so the system becomes active in-game.

@@ -1,4 +1,4 @@
-﻿const MAP_WIDTH = 800;
+const MAP_WIDTH = 800;
 const MAP_HEIGHT = 600;
 const TILE_SIZE = 40;
 const HERO_REVEAL_RADIUS = 88;
@@ -610,8 +610,6 @@ const mapSystem = {
 };
 
 window.mapSystem = mapSystem;
-
-// TODO(agent-1/game.js): import `./map.js` and delegate canvas rendering to `window.mapSystem.renderScene(ctx)`.
 ensureMapState();
 
 export { mapSystem };
