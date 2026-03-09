@@ -12,11 +12,19 @@ const BASE_REACH_RADIUS = 12;
 const ROBOT_THREAT_RADIUS = 92;
 const ENEMY_SPRITE_DRAW_SIZE = 32;
 const BOSS_SPRITE_DRAW_SIZE = 42;
+const DROP_ICON_DRAW_SIZE = 16;
 const ENEMY_SPRITE_PATHS = {
   C: new URL("../assets/enemies/enemy_c_32.png", import.meta.url).href,
   B: new URL("../assets/enemies/enemy_b_32.png", import.meta.url).href,
   A: new URL("../assets/enemies/enemy_a_32.png", import.meta.url).href,
   S: new URL("../assets/enemies/enemy_s_32.png", import.meta.url).href,
+};
+const DROP_ICON_PATHS = {
+  arm: new URL("../assets/parts/part_arm_16.png", import.meta.url).href,
+  leg: new URL("../assets/parts/part_leg_16.png", import.meta.url).href,
+  head: new URL("../assets/parts/part_head_16.png", import.meta.url).href,
+  body: new URL("../assets/parts/part_torso_16.png", import.meta.url).href,
+  gold: new URL("../assets/ui/gold_coin_16.png", import.meta.url).href,
 };
 
 const FALLBACK_PATHS = {
@@ -62,6 +70,9 @@ function createSpriteAsset(src, label) {
 
 const enemySpriteAssets = Object.fromEntries(
   Object.entries(ENEMY_SPRITE_PATHS).map(([grade, src]) => [grade, createSpriteAsset(src, `enemy-${grade}`)])
+);
+const dropSpriteAssets = Object.fromEntries(
+  Object.entries(DROP_ICON_PATHS).map(([kind, src]) => [kind, createSpriteAsset(src, `drop-${kind}`)])
 );
 
 const enemyVisualState = {
@@ -512,6 +523,48 @@ function getEnemySpriteAsset(enemy) {
   return enemySpriteAssets[enemy.grade] || enemySpriteAssets.C;
 }
 
+function getDropSpriteAsset(item) {
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+
+  if (item.kind === "gold") {
+    return dropSpriteAssets.gold || null;
+  }
+
+  if (item.kind === "part") {
+    return dropSpriteAssets[item.partType] || null;
+  }
+
+  return null;
+}
+
+function drawDroppedItemSprites(ctx, gameState) {
+  if (!Array.isArray(gameState.droppedItems)) {
+    return;
+  }
+
+  for (const item of gameState.droppedItems) {
+    if (!item || typeof item.x !== "number" || typeof item.y !== "number") {
+      continue;
+    }
+
+    const asset = getDropSpriteAsset(item);
+    const drawX = Math.round(item.x - DROP_ICON_DRAW_SIZE / 2);
+    const drawY = Math.round(item.y - DROP_ICON_DRAW_SIZE / 2);
+
+    if (asset?.loaded) {
+      ctx.drawImage(asset.image, drawX, drawY, DROP_ICON_DRAW_SIZE, DROP_ICON_DRAW_SIZE);
+      continue;
+    }
+
+    ctx.fillStyle = item.kind === "gold" ? "#ffcf70" : "#d7dde8";
+    ctx.fillRect(drawX, drawY, DROP_ICON_DRAW_SIZE, DROP_ICON_DRAW_SIZE);
+    ctx.fillStyle = "#11151d";
+    ctx.fillText(item.icon || "?", item.x, item.y + 1);
+  }
+}
+
 function drawEnemySprites() {
   const gameState = getGameState();
   const canvas = document.getElementById("game-canvas");
@@ -538,6 +591,11 @@ function drawEnemySprites() {
     const drawY = Math.round(enemy.y - size / 2);
     ctx.drawImage(asset.image, drawX, drawY, size, size);
   }
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = '11px "Courier New", monospace';
+  drawDroppedItemSprites(ctx, gameState);
 
   ctx.restore();
 }
