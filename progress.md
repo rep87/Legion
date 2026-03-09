@@ -1,42 +1,9 @@
-Original prompt: AGENTS.md瑜?癒쇱? ?쎄퀬 ?꾩껜 援ъ“瑜??뚯븙???ㅼ쓬 ?꾨옒 ?묒뾽??吏꾪뻾?댁쨾.
-踰꾨젮吏??됱꽦 諛곌꼍 ??뚮뵒?쒖뒪 寃뚯엫 湲곕컲??留뚮뱾?댁쨾.
-- HTML5 Canvas + Vanilla JS, ?뚯씪 遺꾨━ 援ъ“ (index.html + js/ ?대뜑)
-- 800횞600 罹붾쾭?? ?ㅽ겕 SF ?쎌??꾪듃 ?ㅽ???- ?⑥씠釉??쒖뒪?? 吏??떦 10?⑥씠釉? 5쨌10?⑥씠釉뚮뒗 蹂댁뒪?⑥씠釉?- 吏??援ъ“: A吏????蹂댁뒪 泥섏튂 ??B吏???꾪솚
-- 湲곗? HP, ?꾨젰(Power) ?섏튂 UI ?쒖떆
-- game.js???꾩뿭 gameState 媛앹껜 ?뺤쓽 (?ㅻⅨ 紐⑤뱢 李몄“??
-- ?묒뾽 ?앸굹硫?git add, commit, push源뚯? ?댁쨾
+Original prompt: AGENTS.md를 먼저 읽고 전체 구조를 파악한 다음 아래 작업을 진행해줘.
 
-- 2026-03-09: ??μ냼??`index.html`, `js/` ?대뜑, `game.js`媛 ?녿뒗 珥덇린 ?곹깭 ?뺤씤.
-- 2026-03-09: AGENTS.md 湲곗? ?먯씠?꾪듃 1 踰붿쐞??`index.html`, `js/game.js` 以묒떖?쇰줈 珥덇린 堉덈? ?묒꽦.
-- 2026-03-09: `window.gameState`, `window.render_game_to_text`, `window.advanceTime` 異붽?.
-- 2026-03-09: `node --check js/game.js` ?듦낵.
-- 2026-03-09: Playwright ?대씪?댁뼵???뺤씤 ??`playwright` ?⑦궎吏 遺?щ줈 ?먮룞 釉뚮씪?곗? 寃利앹? 誘몄떎??
-- 2026-03-09: ?먯씠?꾪듃 5 踰붿쐞濡?`js/map.js` 異붽?. 寃쎈줈, ?щ’ UI, ?뷀쓳?쒖빞, 誘몃땲留? ?ы깙 ?ㅼ튂 ?낆쓣 `window.mapSystem`???몄텧.
-- 2026-03-09: `index.html` script tags瑜?module濡??뺣━?섍퀬 `game.js -> hero.js -> enemies.js -> map.js -> inventory.js -> robots.js` ?쒖꽌濡?濡쒕뱶 ?곌껐.
-- 2026-03-09: `js/game.js`??`gameState.paths` 異붽?, `window.enemySystem` ?낅뜲?댄듃 ?낃낵 `window.mapSystem.renderScene(ctx)` ?뚮뜑 ?꾩엫 異붽?.
-- 2026-03-09: 濡쒕뱶 寃利?以?`hero.js` 諛곗뿴??inventory? `inventory.js` 媛앹껜??inventory 異⑸룎濡?`undefined.some` ?고????먮윭 ?뺤씤.
-- 2026-03-09: `hero.js`??inventory slots ?묎렐 ?ы띁瑜?異붽??섍퀬 `inventory.js`?먯꽌 湲곗〈 諛곗뿴 inventory瑜?媛앹껜???곹깭濡??밴꺽?섎룄濡?蹂댁젙.
-- 2026-03-09: `index.html` ?덉씠?꾩썐???ъ젙由ы빐 ?뚯뒪??踰꾪듉???곗륫 ?곷떒?쇰줈 遺꾨━?섍퀬 ?몃깽?좊━瑜?罹붾쾭??諛붾줈 ?꾨옒濡??대룞.
-- 2026-03-09: `js/map.js`?먯꽌 ?꾩쟻 ?쒖빞 ?ㅻ? ?꾩옱 reveal zone?ㅺ낵 ?숆린?뷀븯怨? 寃쎈줈瑜??덇컻 ?꾩뿉 ?ㅼ떆 洹몃젮 ??긽 蹂댁씠?꾨줉 ?섏젙.
-- 2026-03-09: `js/game.js`??源⑥쭊 ?쒓? ?곹깭 臾멸뎄瑜??뺤긽 臾몄옄?대줈 援먯껜?섍퀬, ?꾩옣 珥덇린????`mapData`瑜??④퍡 由ъ뀑?섎룄濡?蹂댁젙.
-- 2026-03-09: `js/hero.js`媛 ?쒖빞瑜?吏곸젒 諛곗뿴??諛???ｌ? ?딄퀬 `window.mapSystem.revealArea()`瑜??곗꽑 ?ъ슜?섎룄濡??섏젙.
-- 2026-03-09: Playwright 寃利앹뿉??`#use-power-button` ?대┃ ???곹깭 臾멸뎄媛 ?뺤긽 ?쒓?濡?異쒕젰?섍퀬 `power: 8`, `usedPower: 2`濡?諛섏쁺?섎뒗 寃??뺤씤.
-- 2026-03-09: 罹붾쾭???대┃ ?대룞 ???곸썒 醫뚰몴媛 `(400, 300) -> (686, 128)`濡?諛붾뚭퀬 `visibleZones`媛 `4 -> 28`濡?利앷????쒖빞 ?꾩쟻???뺤씤.
-- 2026-03-09: `Base Command`瑜?醫뚯륫?먯꽌 ?쒓굅?섍퀬 罹붾쾭???곗륫 而щ읆 ?곷떒?쇰줈 ?대룞.
-- 2026-03-09: `robots.js` 留덉슫??吏?먯쓣 ?곗륫 ?꾩슜 `#robot-layout`?쇰줈 蹂寃쏀븯怨?`Fabricator | Path Slots / Disassembly / Active Robots` 2???덉씠?꾩썐?쇰줈 遺꾨━.
-
-- 2026-03-09: map.js ?뷀쓳?쒖빞瑜??꾩쟻 媛쒕갑 湲곗??쇰줈 ?뺣━?섍퀬, 寃쎈줈/?щ’???덇컻 ???덉씠?대줈 遺꾨━?섎뒗 ?섏젙 李⑹닔.
-- 2026-03-09: 誘몃땲留듭? 硫붿씤 罹붾쾭???ㅻ쾭?덉씠 ????곗륫 ?섎떒 蹂꾨룄 ?⑤꼸 罹붾쾭?ㅻ줈 ?щ같移섑븯?꾨줉 map.js?먯꽌 DOM ?ш뎄??異붽?.
-
-- 2026-03-09: hero.js, enemies.js에 
-ew URL(..., import.meta.url) 기반 PNG 로더를 추가하고, map.js 수정 없이 캔버스 위에 영웅/적 스프라이트를 오버레이 렌더링하도록 보강.
-- 2026-03-09: 적 생성 시 grade를 부여해 ssets/enemies/enemy_[c|b|a|s]_32.png를 대응시키고, 안개 밖 적은 오버레이 렌더에서 제외.
-
-
-- 2026-03-09: Playwright 諛?釉뚮씪?곗? ?됯?濡?mapSystem.describeState().visibleZones媛 4 -> 5濡?利앷??섎ŉ ?꾩쟻 媛쒕갑???좎??섎뒗 寃껉낵, #minimap-slot??.right-column ?섎떒 ?⑤꼸濡??대룞??寃껋쓣 ?뺤씤.
-- 2026-03-09: ?꾩껜 ?섏씠吏 ?ㅽ겕由곗꺑 output/map-fog-layout-check.png?먯꽌 寃쎈줈? ?щ’???덇컻 ?꾩뿉 ?④퀬 誘몃땲留듭씠 ?곗륫 ?섎떒 ?⑤꼸??遺꾨━???곹깭瑜??뺤씤.
-- 2026-03-09: Playwright 캡처로 hero PNG 적용 확인 (output/web-game/shot-0.png).
-- 2026-03-09: 추가 Playwright 검증에서 wave 시작 후 enemy PNG가 캔버스에 렌더되는 것 확인 (output/web-game/enemy-center-shot-wait.png).
-
-- 2026-03-09: hero sprite 로드 시 밝은 저채도 배경 픽셀을 제거하는 전처리를 js/hero.js에 추가해 흰 배경이 보이지 않도록 수정.
-
+- 2026-03-09: 프로젝트 초기 뼈대와 `window.gameState`, `window.render_game_to_text`, `window.advanceTime` 구성을 추가.
+- 2026-03-09: `index.html`에 모듈 스크립트 로드 순서를 정리하고 `game.js -> hero.js -> enemies.js -> map.js -> inventory.js -> robots.js` 순서로 연결.
+- 2026-03-09: `game.js`에서 `mapSystem` / `enemySystem` 연동과 경로 데이터 노출을 추가.
+- 2026-03-09: `hero.js`와 `inventory.js`의 인벤토리 표현 충돌을 보정.
+- 2026-03-09: 안개 시야 누적, 경로 상시 표시, 상태 문자열 한글 복구, 레이아웃 재배치를 반영.
+- 2026-03-09: 우측 로봇 관리 레이아웃을 `Base Command`, `Fabricator`, `Path Slots`, `Disassembly`, `Active Robots` 구조로 재편.
+- 2026-03-09: 테스트 밸런스용으로 `js/hero.js` 기본 근접 공격력을 48로 상향해 C 적이 2~3회 타격 내에 정리되도록 조정.
