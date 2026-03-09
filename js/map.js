@@ -1,13 +1,13 @@
-const MAP_WIDTH = 800;
+﻿const MAP_WIDTH = 800;
 const MAP_HEIGHT = 600;
 const TILE_SIZE = 40;
 const HERO_REVEAL_RADIUS = 88;
 const BASE_REVEAL_RADIUS = 150;
 const VISION_TURRET_REVEAL_RADIUS = 110;
-const MINIMAP_X = 588;
-const MINIMAP_Y = 438;
 const MINIMAP_WIDTH = 200;
 const MINIMAP_HEIGHT = 150;
+const MINIMAP_PANEL_ID = "minimap-slot";
+const MINIMAP_CANVAS_ID = "map-minimap-canvas";
 
 const REGION_THEMES = {
   A: {
@@ -88,15 +88,40 @@ function createRevealZone(x, y, radius, source) {
   return { x, y, radius, source };
 }
 
+function buildRevealKey(x, y, radius, source) {
+  return `${source}:${Math.round(x)}:${Math.round(y)}:${Math.round(radius)}`;
+}
+
+function sanitizeFogOfWar(gameState) {
+  const normalized = [];
+  const seen = new Set();
+
+  for (const zone of Array.isArray(gameState.fogOfWar) ? gameState.fogOfWar : []) {
+    if (!zone || typeof zone.x !== "number" || typeof zone.y !== "number" || typeof zone.radius !== "number") {
+      continue;
+    }
+
+    const source = zone.source || "legacy";
+    const key = buildRevealKey(zone.x, zone.y, zone.radius, source);
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    normalized.push(createRevealZone(zone.x, zone.y, zone.radius, source));
+  }
+
+  gameState.fogOfWar = normalized;
+  return seen;
+}
+
 function ensureMapState() {
   const gameState = getGameState();
   if (!gameState) {
     return null;
   }
 
-  if (!Array.isArray(gameState.fogOfWar)) {
-    gameState.fogOfWar = [];
-  }
+  const revealedZoneKeys = sanitizeFogOfWar(gameState);
 
   if (!gameState.mapData) {
     gameState.mapData = {
@@ -107,16 +132,11 @@ function ensureMapState() {
       hoveredSlotId: null,
       selectedSlotId: null,
       lastHeroRevealCell: null,
+      minimap: null,
     };
   }
 
-  for (const zone of gameState.fogOfWar) {
-    if (!zone || typeof zone.x !== "number" || typeof zone.y !== "number" || typeof zone.radius !== "number") {
-      continue;
-    }
-
-    gameState.mapData.revealedZoneKeys[buildRevealKey(zone.x, zone.y, zone.radius, zone.source || "legacy")] = true;
-  }
+  gameState.mapData.revealedZoneKeys = Object.fromEntries(Array.from(revealedZoneKeys, (key) => [key, true]));
 
   for (const region of Object.keys(SLOT_LAYOUTS)) {
     if (!gameState.mapData.slotsByRegion[region]) {
@@ -131,12 +151,41 @@ function ensureMapState() {
   ensureBaseReveal(gameState);
   syncTurretsFromState(gameState);
   updateHeroVision(gameState);
+  ensureMinimapPanel(gameState);
   return gameState;
 }
 
 function ensureBaseReveal(gameState) {
   const { x, y } = gameState.mapData.baseCore;
   revealArea(gameState, x, y, BASE_REVEAL_RADIUS, "base");
+}
+
+function revealArea(gameState, x, y, radius, source = "dynamic") {
+  const key = buildRevealKey(x, y, radius, source);
+  if (gameState.mapData.revealedZoneKeys[key]) {
+    return false;
+  }
+
+  gameState.mapData.revealedZoneKeys[key] = true;
+  gameState.fogOfWar.push(createRevealZone(x, y, radius, source));
+  return true;
+}
+
+function updateHeroVision(gameState) {
+  const hero = gameState.hero;
+  if (!hero) {
+    return;
+  }
+
+  const cellX = Math.floor(hero.x / TILE_SIZE);
+  const cellY = Math.floor(hero.y / TILE_SIZE);
+  const cellKey = `${cellX},${cellY}`;
+  if (gameState.mapData.lastHeroRevealCell === cellKey) {
+    return;
+  }
+
+  gameState.mapData.lastHeroRevealCell = cellKey;
+  revealArea(gameState, hero.x, hero.y, HERO_REVEAL_RADIUS, `hero:${cellKey}`);
 }
 
 function syncTurretsFromState(gameState) {
@@ -191,38 +240,6 @@ function getAllSlots(gameState) {
 
 function findSlotById(gameState, slotId) {
   return getAllSlots(gameState).find((slot) => slot.id === slotId) || null;
-}
-
-function buildRevealKey(x, y, radius, source) {
-  return `${source}:${Math.round(x)}:${Math.round(y)}:${Math.round(radius)}`;
-}
-
-function revealArea(gameState, x, y, radius, source = "dynamic") {
-  const key = buildRevealKey(x, y, radius, source);
-  if (gameState.mapData.revealedZoneKeys[key]) {
-    return false;
-  }
-
-  gameState.mapData.revealedZoneKeys[key] = true;
-  gameState.fogOfWar.push(createRevealZone(x, y, radius, source));
-  return true;
-}
-
-function updateHeroVision(gameState) {
-  const hero = gameState.hero;
-  if (!hero) {
-    return;
-  }
-
-  const cellX = Math.floor(hero.x / TILE_SIZE);
-  const cellY = Math.floor(hero.y / TILE_SIZE);
-  const cellKey = `${cellX},${cellY}`;
-  if (gameState.mapData.lastHeroRevealCell === cellKey) {
-    return;
-  }
-
-  gameState.mapData.lastHeroRevealCell = cellKey;
-  revealArea(gameState, hero.x, hero.y, HERO_REVEAL_RADIUS, `hero:${cellKey}`);
 }
 
 function isPointVisible(gameState, x, y) {
@@ -346,7 +363,7 @@ function drawSlots(ctx, gameState, theme) {
     const highlight = slot.id === gameState.mapData.selectedSlotId || slot.id === gameState.mapData.hoveredSlotId;
     const robotFull = slot.robots.length >= slot.robotCap;
     const turretFull = Boolean(slot.turret);
-    ctx.fillStyle = highlight ? "rgba(255, 159, 107, 0.18)" : "rgba(9, 12, 18, 0.72)";
+    ctx.fillStyle = highlight ? "rgba(255, 159, 107, 0.22)" : "rgba(9, 12, 18, 0.84)";
     ctx.strokeStyle = robotFull && turretFull ? "#7b8799" : theme.accentSoft;
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -368,11 +385,12 @@ function drawSlots(ctx, gameState, theme) {
 
 function drawFog(ctx, gameState) {
   ctx.save();
-  ctx.fillStyle = "rgba(0, 0, 0, 0.82)";
+  ctx.fillStyle = "rgba(0, 0, 0, 0.84)";
   ctx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
   ctx.globalCompositeOperation = "destination-out";
+
   for (const zone of gameState.fogOfWar) {
-    const gradient = ctx.createRadialGradient(zone.x, zone.y, zone.radius * 0.2, zone.x, zone.y, zone.radius);
+    const gradient = ctx.createRadialGradient(zone.x, zone.y, zone.radius * 0.18, zone.x, zone.y, zone.radius);
     gradient.addColorStop(0, "rgba(0, 0, 0, 1)");
     gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
     ctx.fillStyle = gradient;
@@ -380,51 +398,120 @@ function drawFog(ctx, gameState) {
     ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2);
     ctx.fill();
   }
+
   ctx.restore();
 }
 
-function drawMinimapFrame(ctx) {
-  ctx.fillStyle = "rgba(4, 6, 10, 0.78)";
-  ctx.fillRect(MINIMAP_X, MINIMAP_Y, MINIMAP_WIDTH, MINIMAP_HEIGHT);
-  ctx.strokeStyle = "rgba(255, 107, 45, 0.72)";
-  ctx.strokeRect(MINIMAP_X, MINIMAP_Y, MINIMAP_WIDTH, MINIMAP_HEIGHT);
+function ensureMinimapPanel(gameState) {
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  if (!document.getElementById("map-minimap-style")) {
+    const style = document.createElement("style");
+    style.id = "map-minimap-style";
+    style.textContent = [
+      `#${MINIMAP_PANEL_ID} {`,
+      "  position: relative;",
+      "  right: auto;",
+      "  bottom: auto;",
+      `  width: ${MINIMAP_WIDTH}px;`,
+      `  height: ${MINIMAP_HEIGHT}px;`,
+      "  margin-top: auto;",
+      "  align-self: flex-end;",
+      "  padding: 0;",
+      "  border: 1px solid rgba(255, 107, 45, 0.6);",
+      "  background: rgba(4, 6, 10, 0.9);",
+      "  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);",
+      "  pointer-events: none;",
+      "  overflow: hidden;",
+      "}",
+      `#${MINIMAP_PANEL_ID} .minimap-label {`,
+      "  z-index: 2;",
+      "}",
+      `#${MINIMAP_CANVAS_ID} {`,
+      "  display: block;",
+      `  width: ${MINIMAP_WIDTH}px;`,
+      `  height: ${MINIMAP_HEIGHT}px;`,
+      "  image-rendering: pixelated;",
+      "}",
+    ].join("\n");
+    document.head.appendChild(style);
+  }
+
+  let panel = document.getElementById(MINIMAP_PANEL_ID);
+  if (!panel) {
+    panel = document.createElement("section");
+    panel.id = MINIMAP_PANEL_ID;
+    panel.className = "minimap-slot";
+    const label = document.createElement("span");
+    label.className = "minimap-label";
+    label.textContent = "MINIMAP";
+    panel.appendChild(label);
+  }
+
+  const rightColumn = document.querySelector(".right-column") || document.querySelector(".battle-layout") || document.body;
+  if (panel.parentElement !== rightColumn) {
+    rightColumn.appendChild(panel);
+  }
+
+  let canvas = document.getElementById(MINIMAP_CANVAS_ID);
+  if (!canvas) {
+    canvas = document.createElement("canvas");
+    canvas.id = MINIMAP_CANVAS_ID;
+    canvas.width = MINIMAP_WIDTH;
+    canvas.height = MINIMAP_HEIGHT;
+    panel.appendChild(canvas);
+  }
+
+  const label = panel.querySelector(".minimap-label");
+  if (label && label.parentElement !== panel) {
+    panel.appendChild(label);
+  }
+
+  gameState.mapData.minimap = {
+    panel,
+    canvas,
+    ctx: canvas.getContext("2d"),
+  };
+  return gameState.mapData.minimap;
 }
 
 function toMinimapPoint(x, y) {
   return {
-    x: MINIMAP_X + (x / MAP_WIDTH) * MINIMAP_WIDTH,
-    y: MINIMAP_Y + (y / MAP_HEIGHT) * MINIMAP_HEIGHT,
+    x: (x / MAP_WIDTH) * MINIMAP_WIDTH,
+    y: (y / MAP_HEIGHT) * MINIMAP_HEIGHT,
   };
 }
 
-function drawMinimap(ctx, gameState) {
-  drawMinimapFrame(ctx);
+function drawMinimap(gameState) {
+  const minimap = ensureMinimapPanel(gameState);
+  const minimapCtx = minimap?.ctx;
+  if (!minimapCtx) {
+    return;
+  }
+
+  minimapCtx.clearRect(0, 0, MINIMAP_WIDTH, MINIMAP_HEIGHT);
+  minimapCtx.fillStyle = "rgba(36, 42, 54, 0.92)";
+  minimapCtx.fillRect(0, 0, MINIMAP_WIDTH, MINIMAP_HEIGHT);
 
   const path = getRegionPath(gameState.currentRegion);
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(MINIMAP_X, MINIMAP_Y, MINIMAP_WIDTH, MINIMAP_HEIGHT);
-  ctx.clip();
-
-  ctx.fillStyle = "rgba(36, 42, 54, 0.86)";
-  ctx.fillRect(MINIMAP_X, MINIMAP_Y, MINIMAP_WIDTH, MINIMAP_HEIGHT);
-
-  ctx.strokeStyle = "#777d88";
-  ctx.lineWidth = 4;
-  ctx.beginPath();
+  minimapCtx.strokeStyle = "#777d88";
+  minimapCtx.lineWidth = 4;
+  minimapCtx.beginPath();
   const first = toMinimapPoint(path[0].x, path[0].y);
-  ctx.moveTo(first.x, first.y);
+  minimapCtx.moveTo(first.x, first.y);
   for (let i = 1; i < path.length; i += 1) {
     const point = toMinimapPoint(path[i].x, path[i].y);
-    ctx.lineTo(point.x, point.y);
+    minimapCtx.lineTo(point.x, point.y);
   }
-  ctx.stroke();
+  minimapCtx.stroke();
 
-  const heroPoint = toMinimapPoint(gameState.hero.x, gameState.hero.y);
-  ctx.fillStyle = "#ffffff";
-  ctx.beginPath();
-  ctx.arc(heroPoint.x, heroPoint.y, 3, 0, Math.PI * 2);
-  ctx.fill();
+  for (const slot of gameState.mapData.slotsByRegion[gameState.currentRegion]) {
+    const point = toMinimapPoint(slot.x, slot.y);
+    minimapCtx.fillStyle = slot.turret ? "#ffcf70" : "rgba(255, 159, 107, 0.72)";
+    minimapCtx.fillRect(point.x - 2, point.y - 2, 4, 4);
+  }
 
   for (const enemy of gameState.enemies) {
     if (typeof enemy.x !== "number" || typeof enemy.y !== "number") {
@@ -432,33 +519,29 @@ function drawMinimap(ctx, gameState) {
     }
 
     const enemyPoint = toMinimapPoint(enemy.x, enemy.y);
-    ctx.fillStyle = "#ff4e45";
-    ctx.beginPath();
-    ctx.arc(enemyPoint.x, enemyPoint.y, 2.5, 0, Math.PI * 2);
-    ctx.fill();
+    minimapCtx.fillStyle = "#ff4e45";
+    minimapCtx.beginPath();
+    minimapCtx.arc(enemyPoint.x, enemyPoint.y, 2.5, 0, Math.PI * 2);
+    minimapCtx.fill();
   }
 
-  for (const slot of gameState.mapData.slotsByRegion[gameState.currentRegion]) {
-    const point = toMinimapPoint(slot.x, slot.y);
-    ctx.fillStyle = slot.turret ? "#ffcf70" : "rgba(255, 159, 107, 0.72)";
-    ctx.fillRect(point.x - 2, point.y - 2, 4, 4);
-  }
+  const heroPoint = toMinimapPoint(gameState.hero.x, gameState.hero.y);
+  minimapCtx.fillStyle = "#ffffff";
+  minimapCtx.beginPath();
+  minimapCtx.arc(heroPoint.x, heroPoint.y, 3, 0, Math.PI * 2);
+  minimapCtx.fill();
 
-  ctx.fillStyle = "rgba(0, 0, 0, 0.86)";
+  minimapCtx.fillStyle = "rgba(0, 0, 0, 0.86)";
   for (let y = 0; y < MAP_HEIGHT; y += 12) {
     for (let x = 0; x < MAP_WIDTH; x += 12) {
       if (isPointVisible(gameState, x + 6, y + 6)) {
         continue;
       }
+
       const point = toMinimapPoint(x, y);
-      ctx.fillRect(point.x, point.y, (12 / MAP_WIDTH) * MINIMAP_WIDTH + 1, (12 / MAP_HEIGHT) * MINIMAP_HEIGHT + 1);
+      minimapCtx.fillRect(point.x, point.y, (12 / MAP_WIDTH) * MINIMAP_WIDTH + 1, (12 / MAP_HEIGHT) * MINIMAP_HEIGHT + 1);
     }
   }
-
-  ctx.restore();
-  ctx.fillStyle = "#9aa7b9";
-  ctx.font = '10px "Courier New", monospace';
-  ctx.fillText("MINIMAP", MINIMAP_X + 8, MINIMAP_Y + 12);
 }
 
 function isTurretItem(item) {
@@ -559,15 +642,14 @@ function renderScene(ctx) {
 
   const theme = getTheme(gameState.currentRegion);
   drawBackground(ctx, theme);
-  drawPath(ctx, gameState, theme);
   drawBase(ctx, gameState, theme);
-  drawSlots(ctx, gameState, theme);
   drawDroppedTurretHints(ctx, gameState);
   drawEnemies(ctx, gameState);
   drawHero(ctx, gameState);
   drawFog(ctx, gameState);
   drawPath(ctx, gameState, theme);
-  drawMinimap(ctx, gameState);
+  drawSlots(ctx, gameState, theme);
+  drawMinimap(gameState);
 }
 
 function describeState() {
@@ -590,6 +672,7 @@ function describeState() {
     visibleZones: gameState.fogOfWar.length,
     hoveredSlotId: gameState.mapData.hoveredSlotId,
     selectedSlotId: gameState.mapData.selectedSlotId,
+    minimapAttached: Boolean(gameState.mapData.minimap?.panel?.isConnected),
     slots,
   };
 }
