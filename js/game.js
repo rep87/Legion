@@ -56,36 +56,40 @@ const gameState = {
     A: { cleared: false, bossDefeated: false },
     B: { cleared: false, bossDefeated: false },
   },
+  stage: 1,
   wave: 1,
-  maxWaves: 10,
+  maxWaves: 5,
   isBossWave: false,
   waveActive: false,
+  stageComplete: false,
   baseHP: 100,
   maxBaseHP: 100,
   power: 10,
   maxPower: 10,
   usedPower: 0,
-  gold: 100,
-  hero: { x: 400, y: 300, hp: 100, maxHP: 100, items: [null, null] },
+  gold: 120,
+  hero: { x: 360, y: 310, hp: 100, maxHP: 100, items: [null, null] },
   droppedItems: [],
   placedRobots: [],
   enemies: [],
-  fogOfWar: [{ x: 320, y: 220, radius: 140 }],
+  fogOfWar: [
+    { x: 96, y: 478, radius: 180, source: "base" },
+    { x: 360, y: 310, radius: 120, source: "hero:start" },
+  ],
   elapsedInWave: 0,
-  waveDuration: 12,
-  message: "대기 중. 다음 웨이브 가동 버튼으로 전투를 시작합니다.",
+  message: "Stage 1: assemble robots from parts and hold Sector A through wave 5.",
 };
 
 window.gameState = gameState;
 
 function syncBossWave() {
-  gameState.isBossWave = gameState.wave === 5 || gameState.wave === 10;
+  gameState.isBossWave = gameState.wave === gameState.maxWaves;
 }
 
 function updateHUD() {
   hud.gold.textContent = String(gameState.gold);
   hud.power.textContent = `${gameState.power} / ${gameState.maxPower}`;
-  hud.wave.textContent = `${gameState.currentRegion}-${String(gameState.wave).padStart(2, "0")}${gameState.isBossWave ? " BOSS" : ""}`;
+  hud.wave.textContent = `A-${String(gameState.wave).padStart(2, "0")}${gameState.isBossWave ? " BOSS" : ""}`;
   hud.baseHP.textContent = `${gameState.baseHP} / ${gameState.maxBaseHP}`;
   hud.status.textContent = gameState.message;
 }
@@ -98,7 +102,12 @@ function clampState() {
 
 function beginWave() {
   if (gameState.waveActive) {
-    gameState.message = "이미 전투가 진행 중입니다.";
+    gameState.message = "A wave is already in progress.";
+    return;
+  }
+
+  if (gameState.stageComplete) {
+    gameState.message = "Stage 1 is clear. Restart to play again.";
     return;
   }
 
@@ -106,87 +115,58 @@ function beginWave() {
   gameState.waveActive = true;
   gameState.elapsedInWave = 0;
   gameState.message = gameState.isBossWave
-    ? `${gameState.currentRegion}지역 보스 웨이브 개시. 방어선을 유지하세요.`
-    : `${gameState.currentRegion}지역 ${gameState.wave}웨이브 개시. 적 신호 감지.`;
+    ? "Final wave: a heavy boss is entering. Keep the robot line alive."
+    : `Sector A wave ${gameState.wave} started. Use the hero to finish stragglers and recover drops.`;
 }
 
 function completeWave() {
   gameState.waveActive = false;
-  gameState.gold += gameState.isBossWave ? 60 : 25;
+  gameState.gold += gameState.isBossWave ? 90 : 30;
 
   if (gameState.wave < gameState.maxWaves) {
     gameState.wave += 1;
     syncBossWave();
-    gameState.message = `${gameState.currentRegion}지역 웨이브 정리 완료. 다음 웨이브를 준비하세요.`;
+    gameState.message = `Wave cleared. Reward paid. Next: A-${String(gameState.wave).padStart(2, "0")}.`;
     return;
   }
 
-  if (gameState.currentRegion === "A" && !gameState.regions.A.bossDefeated) {
-    gameState.regions.A.cleared = true;
-    gameState.regions.A.bossDefeated = true;
-    gameState.currentRegion = "B";
-    gameState.wave = 1;
-    gameState.isBossWave = false;
-    gameState.message = "A지역 보스 격파. B지역 교두보가 개방되었습니다.";
-    gameState.fogOfWar.push({ x: 560, y: 280, radius: 110 });
-    return;
-  }
-
-  gameState.regions.B.cleared = true;
-  gameState.regions.B.bossDefeated = true;
-  gameState.wave = gameState.maxWaves;
-  gameState.isBossWave = true;
-  gameState.message = "B지역까지 제압 완료. 후속 콘텐츠용 스테이징 상태입니다.";
+  gameState.regions.A.cleared = true;
+  gameState.regions.A.bossDefeated = true;
+  gameState.stageComplete = true;
+  gameState.message = "Stage 1 clear. Sector A base is stabilized.";
 }
 
 function resetBattle() {
-  gameState.currentRegion = "A";
-  gameState.regions.A.cleared = false;
-  gameState.regions.A.bossDefeated = false;
-  gameState.regions.B.cleared = false;
-  gameState.regions.B.bossDefeated = false;
-  gameState.wave = 1;
-  gameState.isBossWave = false;
-  gameState.waveActive = false;
-  gameState.baseHP = 100;
-  gameState.maxBaseHP = 100;
-  gameState.usedPower = 0;
-  gameState.maxPower = 10;
-  gameState.power = 10;
-  gameState.gold = 100;
-  gameState.elapsedInWave = 0;
-  gameState.message = "전장을 초기화했습니다. A지역 1웨이브부터 다시 시작합니다.";
-  gameState.fogOfWar = [{ x: 320, y: 220, radius: 140 }];
-  delete gameState.mapData;
+  window.location.reload();
 }
 
 function damageBase(amount) {
   gameState.baseHP -= amount;
-  gameState.message = `기지가 ${amount}의 피해를 받았습니다.`;
+  gameState.message = `Base took ${amount} damage.`;
   if (gameState.baseHP <= 0) {
     gameState.waveActive = false;
-    gameState.message = "기지가 붕괴했습니다. 전장 초기화가 필요합니다.";
+    gameState.message = "Base destroyed. Restart and rebuild the defense line.";
   }
 }
 
 function usePower(amount) {
   const nextUsage = gameState.usedPower + amount;
   if (nextUsage > gameState.maxPower) {
-    gameState.message = "전력이 부족합니다. 추가 로봇 배치는 불가합니다.";
+    gameState.message = "Not enough power for another robot.";
     return;
   }
 
   gameState.usedPower = nextUsage;
-  gameState.message = `${amount} 전력을 소모했습니다. 현재 배치 전력 ${gameState.usedPower}/${gameState.maxPower}.`;
+  gameState.message = `Used ${amount} power. Current load ${gameState.usedPower}/${gameState.maxPower}.`;
 }
 
 function update(deltaSeconds) {
   window.enemySystem?.syncWaveSpawns();
   window.enemySystem?.update(deltaSeconds);
 
-  if (gameState.waveActive) {
+  if (gameState.waveActive && gameState.baseHP > 0) {
     gameState.elapsedInWave += deltaSeconds;
-    if (gameState.elapsedInWave >= gameState.waveDuration) {
+    if (gameState.elapsedInWave > 0.7 && Array.isArray(gameState.enemies) && gameState.enemies.length === 0) {
       completeWave();
     }
   }
@@ -195,7 +175,7 @@ function update(deltaSeconds) {
   updateHUD();
 }
 
-function drawBackground(theme) {
+function drawFallbackBackground(theme) {
   const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
   sky.addColorStop(0, theme.skyTop);
   sky.addColorStop(1, theme.skyBottom);
@@ -215,77 +195,25 @@ function drawBackground(theme) {
   ctx.fillRect(0, 422, canvas.width, 8);
 }
 
-function drawPath(theme) {
+function drawFallbackScene() {
+  const theme = REGION_THEMES[gameState.currentRegion];
+  drawFallbackBackground(theme);
   ctx.strokeStyle = "#6e727a";
   ctx.lineWidth = 20;
-  ctx.lineCap = "square";
   ctx.beginPath();
-  ctx.moveTo(0, 510);
-  ctx.lineTo(180, 510);
-  ctx.lineTo(180, 360);
-  ctx.lineTo(430, 360);
-  ctx.lineTo(430, 470);
-  ctx.lineTo(800, 470);
+  for (const [index, point] of gameState.paths.A.entries()) {
+    if (index === 0) ctx.moveTo(point.x, point.y);
+    else ctx.lineTo(point.x, point.y);
+  }
   ctx.stroke();
 
-  ctx.strokeStyle = theme.accent;
-  ctx.lineWidth = 2;
-  ctx.setLineDash([8, 8]);
-  ctx.beginPath();
-  ctx.moveTo(0, 510);
-  ctx.lineTo(180, 510);
-  ctx.lineTo(180, 360);
-  ctx.lineTo(430, 360);
-  ctx.lineTo(430, 470);
-  ctx.lineTo(800, 470);
-  ctx.stroke();
-  ctx.setLineDash([]);
-}
-
-function drawBase(theme) {
   ctx.fillStyle = "#111927";
   ctx.fillRect(42, 442, 110, 72);
   ctx.fillStyle = theme.accent;
   ctx.fillRect(54, 454, 18, 46);
-  ctx.fillStyle = "#ffcf70";
-  ctx.fillRect(82, 454, 24, 18);
   ctx.fillStyle = "#e5edf8";
   ctx.font = '12px "Courier New", monospace';
   ctx.fillText("BASE", 78, 490);
-}
-
-function drawHero() {
-  ctx.fillStyle = "#d2dae6";
-  ctx.fillRect(gameState.hero.x - 6, gameState.hero.y - 10, 12, 20);
-  ctx.fillStyle = "#ff6b2d";
-  ctx.fillRect(gameState.hero.x - 3, gameState.hero.y - 15, 6, 6);
-}
-
-function drawWaveBanner(theme) {
-  ctx.fillStyle = "rgba(5, 7, 12, 0.72)";
-  ctx.fillRect(250, 24, 300, 46);
-  ctx.strokeStyle = theme.accent;
-  ctx.strokeRect(250, 24, 300, 46);
-  ctx.fillStyle = "#e7edf7";
-  ctx.font = '16px "Courier New", monospace';
-  ctx.fillText(
-    `${REGION_THEMES[gameState.currentRegion].name}  WAVE ${String(gameState.wave).padStart(2, "0")}${gameState.isBossWave ? "  BOSS" : ""}`,
-    268,
-    52
-  );
-}
-
-function drawRegionMarkers(theme) {
-  ctx.fillStyle = "rgba(255, 255, 255, 0.04)";
-  for (let i = 0; i < 4; i += 1) {
-    ctx.fillRect(220 + i * 120, 180 + (i % 2) * 36, 60, 2);
-  }
-
-  ctx.strokeStyle = theme.accent;
-  ctx.strokeRect(610, 126, 118, 68);
-  ctx.fillStyle = "#dfe7f4";
-  ctx.font = '12px "Courier New", monospace';
-  ctx.fillText(`REGION ${gameState.currentRegion}`, 630, 165);
 }
 
 function render() {
@@ -294,13 +222,7 @@ function render() {
     return;
   }
 
-  const theme = REGION_THEMES[gameState.currentRegion];
-  drawBackground(theme);
-  drawPath(theme);
-  drawBase(theme);
-  drawHero();
-  drawWaveBanner(theme);
-  drawRegionMarkers(theme);
+  drawFallbackScene();
 }
 
 let lastTimestamp = performance.now();
@@ -315,10 +237,7 @@ function frame(timestamp) {
 
 function focusElement(selector) {
   const element = document.querySelector(selector);
-  if (!element) {
-    return;
-  }
-
+  if (!element) return;
   element.scrollIntoView({ behavior: "smooth", block: "nearest" });
   if (typeof element.focus === "function") {
     element.focus({ preventScroll: true });
@@ -326,43 +245,25 @@ function focusElement(selector) {
 }
 
 function bindUI() {
-  document.getElementById("start-wave-button").addEventListener("click", () => {
-    beginWave();
-  });
-
-  document.getElementById("focus-battlefield-button")?.addEventListener("click", () => {
-    focusElement("#game-canvas");
-  });
-
-  document.getElementById("focus-fabricator-button")?.addEventListener("click", () => {
-    focusElement("#robots-module-root");
-  });
-
-  document.getElementById("focus-inventory-button")?.addEventListener("click", () => {
-    focusElement("#inventory-panel");
-  });
-
-  document.getElementById("damage-base-button").addEventListener("click", () => {
-    damageBase(12);
-  });
-
-  document.getElementById("use-power-button").addEventListener("click", () => {
-    usePower(2);
-  });
-
-  document.getElementById("reset-battle-button").addEventListener("click", () => {
-    resetBattle();
-  });
+  document.getElementById("start-wave-button")?.addEventListener("click", beginWave);
+  document.getElementById("focus-battlefield-button")?.addEventListener("click", () => focusElement("#game-canvas"));
+  document.getElementById("focus-fabricator-button")?.addEventListener("click", () => focusElement("#robots-module-root"));
+  document.getElementById("focus-inventory-button")?.addEventListener("click", () => focusElement("#inventory-panel"));
+  document.getElementById("damage-base-button")?.addEventListener("click", () => damageBase(12));
+  document.getElementById("use-power-button")?.addEventListener("click", () => usePower(2));
+  document.getElementById("reset-battle-button")?.addEventListener("click", resetBattle);
 }
 
 function renderGameToText() {
   return JSON.stringify({
     coordinateSystem: "origin top-left, +x right, +y down",
+    stage: gameState.stage,
     region: gameState.currentRegion,
     wave: gameState.wave,
     maxWaves: gameState.maxWaves,
     isBossWave: gameState.isBossWave,
     waveActive: gameState.waveActive,
+    stageComplete: gameState.stageComplete,
     baseHP: gameState.baseHP,
     maxBaseHP: gameState.maxBaseHP,
     power: {
@@ -370,12 +271,33 @@ function renderGameToText() {
       used: gameState.usedPower,
       max: gameState.maxPower,
     },
+    gold: gameState.gold,
     hero: {
       x: Math.round(gameState.hero.x),
       y: Math.round(gameState.hero.y),
       hp: gameState.hero.hp,
     },
-    regions: gameState.regions,
+    enemies: (gameState.enemies || []).map((enemy) => ({
+      id: enemy.id,
+      x: Math.round(enemy.x),
+      y: Math.round(enemy.y),
+      hp: Math.round(enemy.hp),
+      boss: Boolean(enemy.isBoss),
+    })),
+    robots: (gameState.placedRobots || []).map((robot) => ({
+      id: robot.id,
+      x: Math.round(robot.x),
+      y: Math.round(robot.y),
+      hp: Math.round(robot.hp),
+      slotId: robot.slotId,
+    })),
+    drops: (gameState.droppedItems || []).map((item) => ({
+      kind: item.kind,
+      x: Math.round(item.x),
+      y: Math.round(item.y),
+      grade: item.grade || null,
+      partType: item.partType || null,
+    })),
     status: gameState.message,
   });
 }

@@ -47,7 +47,7 @@ const FALLBACK_PATHS = {
 };
 
 const REGION_TEMPLATES = {
-  A: { hp: 40, speed: 46, attack: 8, gold: 8, color: "#e76845" },
+  A: { hp: 34, speed: 42, attack: 7, gold: 9, color: "#e76845" },
   B: { hp: 62, speed: 54, attack: 12, gold: 12, color: "#ff9258" },
 };
 
@@ -170,20 +170,20 @@ function formatEnemyDebugLabel(enemy) {
 
 function formatPartTypeLabel(partType) {
   return {
-    arm: "\uD314",
-    leg: "\uB2E4\uB9AC",
-    head: "\uBA38\uB9AC",
-    body: "\uBAB8\uD1B5",
+    arm: "Arm",
+    leg: "Legs",
+    head: "Head",
+    body: "Torso",
   }[partType] || partType;
 }
 
 function buildDropDebugMessage(enemy, droppedParts) {
   if (!droppedParts.length) {
-    return `${formatEnemyDebugLabel(enemy)} \uCC98\uCE58 -> \uB4DC\uB86D \uC5C6\uC74C`;
+    return `${formatEnemyDebugLabel(enemy)} destroyed -> no part drop`;
   }
 
   const firstDrop = droppedParts[0];
-  return `${formatEnemyDebugLabel(enemy)} \uCC98\uCE58 -> ${formatPartTypeLabel(firstDrop.partType)}(${firstDrop.grade}) \uB4DC\uB86D`;
+  return `${formatEnemyDebugLabel(enemy)} destroyed -> ${formatPartTypeLabel(firstDrop.partType)}(${firstDrop.grade}) drop`;
 }
 
 function getPathForRegion(region) {
@@ -234,8 +234,8 @@ function createEnemy(options = {}) {
   const path = getPathForRegion(region);
   const start = path[0];
 
-  const bossMultiplier = options.boss === "wave" ? 10 : options.boss === "region" ? 18 : 1;
-  const waveScale = 1 + Math.max(0, wave - 1) * 0.12;
+  const bossMultiplier = options.boss === "wave" ? 5 : options.boss === "region" ? 12 : 1;
+  const waveScale = 1 + Math.max(0, wave - 1) * 0.1;
 
   return {
     id: randomId("enemy"),
@@ -252,7 +252,7 @@ function createEnemy(options = {}) {
     radius: options.boss ? 14 : 9,
     maxHP: Math.round(template.hp * waveScale * bossMultiplier),
     hp: Math.round(template.hp * waveScale * bossMultiplier),
-    speed: Math.max(18, template.speed - (options.boss ? 10 : 0) + Math.min(wave * 1.5, 14)),
+    speed: Math.max(18, template.speed - (options.boss ? 12 : 0) + Math.min(wave * 1.2, 10)),
     attack: Math.round(template.attack * waveScale * bossMultiplier),
     goldReward: Math.round(template.gold * waveScale * (options.boss === "region" ? 5 : options.boss === "wave" ? 3 : 1)),
     color: options.boss === "region" ? "#ffd166" : options.boss === "wave" ? "#ff6b2d" : template.color,
@@ -322,7 +322,7 @@ function damageBaseFromEnemy(enemy) {
 
   enemy.reachedBase = true;
   gameState.baseHP = Math.max(0, gameState.baseHP - enemy.attack);
-  gameState.message = `${enemy.bossType === "region" ? "\uC9C0\uC5ED \uBCF4\uC2A4" : enemy.isBoss ? "\uBCF4\uC2A4" : "\uC801 \uB85C\uBD07"}\uAC00 \uAE30\uC9C0\uC5D0 ${enemy.attack} \uD53C\uD574\uB97C \uC785\uD614\uC2B5\uB2C8\uB2E4.`;
+  gameState.message = `${enemy.bossType === "region" ? "Region boss" : enemy.isBoss ? "Boss" : "Enemy robot"} hit the base for ${enemy.attack} damage.`;
 }
 
 function maybeDamageRobot(enemy, now) {
@@ -365,7 +365,7 @@ function maybeDamageRobot(enemy, now) {
   }
 
   enemy.lastRobotHitAt = now;
-  gameState.message = `${enemy.bossType === "region" ? "\uC9C0\uC5ED \uBCF4\uC2A4" : "\uC6E8\uC774\uBE0C \uBCF4\uC2A4"}\uAC00 \uC544\uAD70 \uB85C\uBD07\uC5D0 ${enemy.attack} \uD53C\uD574\uB97C \uC785\uD614\uC2B5\uB2C8\uB2E4.`;
+  gameState.message = `${enemy.bossType === "region" ? "Region boss" : "Wave boss"} hit an allied robot for ${enemy.attack} damage.`;
 }
 
 function removeExpiredDrops(now = performance.now()) {
@@ -384,18 +384,18 @@ function spawnWave() {
 
   if (gameState.isBossWave) {
     gameState.enemies.push(createEnemy({ region, wave, boss: "wave", type: "crusher" }));
-    gameState.message = `${region}\uC9C0\uC5ED ${wave}\uC6E8\uC774\uBE0C \uBCF4\uC2A4 \uCD9C\uD604. \uBC29\uC5B4\uC120\uC744 \uC720\uC9C0\uD558\uC138\uC694.`;
+    gameState.message = `Sector ${region} wave ${wave} boss deployed. Hold the line.`;
     return gameState.enemies;
   }
 
-  const count = Math.min(12, 4 + wave);
+  const count = Math.min(9, 3 + wave);
   for (let index = 0; index < count; index += 1) {
     const enemy = createEnemy({ region, wave, type: index % 3 === 0 ? "raider" : "scout" });
     enemy.x -= index * 28;
     gameState.enemies.push(enemy);
   }
 
-  gameState.message = `${region}\uC9C0\uC5ED ${wave}\uC6E8\uC774\uBE0C \uC801 \uB85C\uBD07 ${count}\uAE30\uAC00 \uACBD\uB85C\uC5D0 \uD22C\uC785\uB418\uC5C8\uC2B5\uB2C8\uB2E4.`;
+  gameState.message = `Sector ${region} wave ${wave}: ${count} enemy robots deployed.`;
   return gameState.enemies;
 }
 
@@ -410,7 +410,7 @@ function spawnRegionBoss(region = getGameState().currentRegion) {
   boss.radius = 18;
   boss.speed = Math.max(22, boss.speed - 8);
   gameState.enemies.push(boss);
-  gameState.message = `${region}\uC9C0\uC5ED \uC9C0\uC5ED \uBCF4\uC2A4\uAC00 \uCD9C\uD604\uD588\uC2B5\uB2C8\uB2E4. \uCC98\uCE58 \uC2DC \uB2E4\uC74C \uC9C0\uC5ED\uC774 \uAC1C\uBC29\uB429\uB2C8\uB2E4.`;
+  gameState.message = `Sector ${region} region boss deployed. Defeat it to unlock the next sector.`;
   return boss;
 }
 
@@ -423,14 +423,14 @@ function triggerRegionTransition(region) {
     gameState.wave = 1;
     gameState.isBossWave = false;
     gameState.waveActive = false;
-    gameState.message = "A\uC9C0\uC5ED \uC9C0\uC5ED \uBCF4\uC2A4 \uACA9\uD30C. B\uC9C0\uC5ED \uC804\uD658 \uD2B8\uB9AC\uAC70\uAC00 \uD65C\uC131\uD654\uB418\uC5C8\uC2B5\uB2C8\uB2E4.";
+    gameState.message = "Sector A boss defeated. Sector B transition is now available.";
     return;
   }
 
   gameState.regions.B.cleared = true;
   gameState.regions.B.bossDefeated = true;
   gameState.waveActive = false;
-  gameState.message = "B\uC9C0\uC5ED \uC9C0\uC5ED \uBCF4\uC2A4\uB97C \uACA9\uD30C\uD588\uC2B5\uB2C8\uB2E4. \uD604\uC7AC \uAD6C\uD604 \uBC94\uC704\uC5D0\uC11C \uBAA8\uB4E0 \uC9C0\uC5ED\uC774 \uC815\uB9AC\uB418\uC5C8\uC2B5\uB2C8\uB2E4.";
+  gameState.message = "Sector B boss defeated. All implemented sectors are clear.";
 }
 
 function handleEnemyDeath(enemy) {
@@ -448,8 +448,8 @@ function handleEnemyDeath(enemy) {
     triggerRegionTransition(enemy.region);
   } else {
     gameState.message = enemy.isBoss
-      ? `${enemy.region}\uC9C0\uC5ED \uC6E8\uC774\uBE0C \uBCF4\uC2A4\uB97C \uACA9\uD30C\uD588\uC2B5\uB2C8\uB2E4.`
-      : "\uC801 \uB85C\uBD07\uC744 \uD30C\uAD34\uD558\uACE0 \uC804\uB9AC\uD488\uC744 \uD68C\uC218\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.";
+      ? `Sector ${enemy.region} wave boss defeated.`
+      : "Enemy robot destroyed. Recover the salvage drops.";
   }
 }
 
@@ -546,7 +546,7 @@ function drawDroppedItemSprites(ctx, gameState) {
   }
 
   for (const item of gameState.droppedItems) {
-    if (!item || typeof item.x !== "number" || typeof item.y !== "number") {
+    if (!item || typeof item.x !== "number" || typeof item.y !== "number" || !isPointVisible(item.x, item.y)) {
       continue;
     }
 
@@ -578,7 +578,7 @@ function drawEnemySprites() {
   ctx.imageSmoothingEnabled = false;
 
   for (const enemy of gameState.enemies) {
-    if (!enemy || typeof enemy.x !== "number" || typeof enemy.y !== "number") {
+    if (!enemy || typeof enemy.x !== "number" || typeof enemy.y !== "number" || !isPointVisible(enemy.x, enemy.y)) {
       continue;
     }
 

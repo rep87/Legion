@@ -2,24 +2,29 @@ const ROBOT_REQUIRED_PARTS = ["arm", "legs", "head", "torso"];
 const ROBOT_RANKS = ["C", "B", "A", "S"];
 const ROBOT_SPRITE_PATH = new URL("../assets/robots/ally_robot_32_base.png", import.meta.url).href;
 const ROBOT_PATH_SLOTS = [
-  { id: "slot-alpha", label: "Alpha", x: 180, y: 500 },
-  { id: "slot-bravo", label: "Bravo", x: 270, y: 360 },
-  { id: "slot-charlie", label: "Charlie", x: 430, y: 415 },
-  { id: "slot-delta", label: "Delta", x: 600, y: 470 },
+  { id: "A-1", label: "A-1 Outpost", x: 110, y: 470 },
+  { id: "A-2", label: "A-2 Bend", x: 220, y: 400 },
+  { id: "A-3", label: "A-3 Midline", x: 335, y: 325 },
+  { id: "A-4", label: "A-4 Rear", x: 470, y: 428 },
+  { id: "A-5", label: "A-5 Gate", x: 645, y: 438 },
 ];
 const ROBOT_RANK_POWER = { C: 2, B: 3, A: 4, S: 5 };
+const ROBOT_RANK_COST = { C: 14, B: 28, A: 56, S: 110 };
 const ROBOT_RANK_AURA = {
-  C: { radius: 70, bonus: 0.04 },
-  B: { radius: 90, bonus: 0.08 },
-  A: { radius: 110, bonus: 0.12 },
-  S: { radius: 140, bonus: 0.18 },
+  C: { radius: 70, bonus: 0.05 },
+  B: { radius: 92, bonus: 0.09 },
+  A: { radius: 118, bonus: 0.14 },
+  S: { radius: 145, bonus: 0.2 },
 };
-const ROBOT_RANK_COST = { C: 20, B: 40, A: 75, S: 120 };
-const ROBOT_ATTACK_RANGE_BASE = 92;
-const ROBOT_ATTACK_DAMAGE_BASE = 12;
-const ROBOT_ATTACK_COOLDOWN_BASE = 1.25;
 const ROBOT_SPRITE_SIZE = 32;
-const ROBOT_ATTACK_FLASH_MS = 140;
+const ROBOT_ATTACK_FLASH_MS = 130;
+
+const TYPE_LABELS = {
+  arm: "Arm",
+  legs: "Legs",
+  head: "Head",
+  torso: "Torso",
+};
 
 function createSpriteAsset(src) {
   const image = new Image();
@@ -43,38 +48,51 @@ function createRobotsModule() {
     return null;
   }
 
-  const robotsState = gameState.robotFactory ?? {
-    selectedPartIds: {
-      arm: null,
-      legs: null,
-      head: null,
-      torso: null,
-    },
+  const robotsState = {
+    selectedPartIds: { arm: null, legs: null, head: null, torso: null },
     robots: [],
     lastRobotId: 0,
-    warning: "",
-    pathSlots: ROBOT_PATH_SLOTS.map((slot) => ({ ...slot, robotIds: [], turretCount: slot.id === "slot-alpha" ? 1 : 0 })),
+    warning: "Starter parts are ready. Assemble one defender before the first wave.",
+    pathSlots: ROBOT_PATH_SLOTS.map((slot) => ({ ...slot, robotIds: [] })),
+    ...(gameState.robotFactory ?? {}),
   };
 
   gameState.robotFactory = robotsState;
-  gameState.placedRobots = robotsState.robots;
+  gameState.placedRobots = robotsState.robots.filter((robot) => robot.slotId && robot.combatEnabled);
   window.gameState = gameState;
 
-  const styleId = "robots-module-style";
-  if (!document.getElementById(styleId)) {
+  installStyles();
+
+  const layoutMount = document.getElementById("robot-layout");
+  if (!layoutMount) {
+    return null;
+  }
+
+  let mount = document.getElementById("robots-module-root");
+  if (!mount) {
+    mount = document.createElement("section");
+    mount.id = "robots-module-root";
+    layoutMount.appendChild(mount);
+  }
+
+  function installStyles() {
+    if (document.getElementById("robots-module-style")) {
+      return;
+    }
+
     const style = document.createElement("style");
-    style.id = styleId;
+    style.id = "robots-module-style";
     style.textContent = `
       #robots-module-root {
         display: grid;
         grid-template-columns: minmax(260px, 320px) minmax(300px, 1fr);
-        gap: 16px;
+        gap: 14px;
         min-height: 100%;
       }
       .robot-column {
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: 14px;
       }
       .robot-panel {
         border: 1px solid #243246;
@@ -84,7 +102,7 @@ function createRobotsModule() {
       .robot-subtitle {
         margin: 0 0 10px;
         font-size: 13px;
-        color: #ff9f6b;
+        color: #ffad73;
         text-transform: uppercase;
       }
       .robot-parts,
@@ -110,46 +128,22 @@ function createRobotsModule() {
       .robot-slot-row button,
       .robot-card button {
         margin-top: 8px;
+        min-height: 44px;
       }
       .robot-meta,
       .robot-warning {
         font-size: 12px;
         color: #cbd5e1;
+        line-height: 1.45;
       }
       .robot-warning {
         min-height: 18px;
-        color: #ff9f6b;
+        color: #ffad73;
         margin-top: 10px;
       }
       .robot-list {
-        max-height: 420px;
+        max-height: 430px;
         overflow: auto;
-      }
-      .robot-dropzone {
-        min-height: 72px;
-        border: 1px dashed #7a3116;
-        padding: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #8b98aa;
-        text-align: center;
-      }
-      .robot-dropzone[data-active="true"] {
-        border-color: #ff6b2d;
-        color: #e7edf7;
-      }
-      .robot-commands {
-        display: grid;
-        gap: 6px;
-      }
-      .robot-inline-select {
-        width: 100%;
-        margin-top: 10px;
-        background: #0b1119;
-        color: #e7edf7;
-        border: 1px solid #243246;
-        padding: 8px;
       }
       @media (max-width: 1180px) {
         #robots-module-root {
@@ -158,18 +152,6 @@ function createRobotsModule() {
       }
     `;
     document.head.appendChild(style);
-  }
-
-  const layoutMount = document.getElementById("robot-layout");
-  if (!layoutMount) {
-    return null;
-  }
-
-  let mount = document.getElementById("robots-module-root");
-  if (!mount) {
-    mount = document.createElement("section");
-    mount.id = "robots-module-root";
-    layoutMount.appendChild(mount);
   }
 
   function setWarning(message) {
@@ -200,9 +182,7 @@ function createRobotsModule() {
   function autoFillSelection() {
     ROBOT_REQUIRED_PARTS.forEach((type) => {
       const existing = getItemById(robotsState.selectedPartIds[type]);
-      if (existing) {
-        return;
-      }
+      if (existing) return;
       const candidate = findSelectablePart(type);
       robotsState.selectedPartIds[type] = candidate?.id ?? null;
     });
@@ -212,97 +192,137 @@ function createRobotsModule() {
     return ROBOT_REQUIRED_PARTS.map((type) => getItemById(robotsState.selectedPartIds[type])).filter(Boolean);
   }
 
+  function getRankIndex(rank) {
+    return Math.max(0, ROBOT_RANKS.indexOf(rank));
+  }
+
   function calculateRobotRank(parts) {
     const ranks = parts.map((part) => part.rank);
     return ranks.sort((a, b) => ROBOT_RANKS.indexOf(a) - ROBOT_RANKS.indexOf(b))[0] ?? "C";
   }
 
   function calculatePowerCost(parts) {
-    const rank = calculateRobotRank(parts);
-    return ROBOT_RANK_POWER[rank];
+    return ROBOT_RANK_POWER[calculateRobotRank(parts)];
   }
 
   function calculateGoldCost(parts) {
-    const total = parts.reduce((sum, part) => sum + ROBOT_RANK_COST[part.rank], 0);
-    return Math.floor(total * 0.5);
-  }
-
-  function getRankIndex(rank) {
-    return Math.max(0, ROBOT_RANKS.indexOf(rank));
+    return Math.floor(parts.reduce((sum, part) => sum + ROBOT_RANK_COST[part.rank], 0) * 0.55);
   }
 
   function computeAttackRange(parts) {
     const armRank = parts.find((part) => part.type === "arm")?.rank ?? "C";
     const headRank = parts.find((part) => part.type === "head")?.rank ?? "C";
-    return ROBOT_ATTACK_RANGE_BASE + getRankIndex(armRank) * 16 + getRankIndex(headRank) * 12;
+    return 112 + getRankIndex(armRank) * 18 + getRankIndex(headRank) * 14;
   }
 
   function computeAttackDamage(parts) {
     const armRank = parts.find((part) => part.type === "arm")?.rank ?? "C";
     const legsRank = parts.find((part) => part.type === "legs")?.rank ?? "C";
-    return ROBOT_ATTACK_DAMAGE_BASE + getRankIndex(armRank) * 7 + getRankIndex(legsRank) * 4;
+    return 18 + getRankIndex(armRank) * 8 + getRankIndex(legsRank) * 4;
   }
 
   function computeAttackCooldown(parts) {
     const headRank = parts.find((part) => part.type === "head")?.rank ?? "C";
-    const armRank = parts.find((part) => part.type === "arm")?.rank ?? "C";
-    return Math.max(0.32, ROBOT_ATTACK_COOLDOWN_BASE - getRankIndex(headRank) * 0.15 - getRankIndex(armRank) * 0.08);
+    return Math.max(0.45, 1.05 - getRankIndex(headRank) * 0.14);
+  }
+
+  function getPathSlot(slotId) {
+    return robotsState.pathSlots.find((slot) => slot.id === slotId) ?? null;
+  }
+
+  function getFirstAvailableSlot() {
+    return robotsState.pathSlots.find((slot) => slot.robotIds.length < 3) ?? null;
+  }
+
+  function syncPlacedRobots() {
+    gameState.placedRobots = robotsState.robots.filter((robot) => robot.slotId && robot.combatEnabled && !robot.isRecovering);
+  }
+
+  function moveRobotToSlot(robotId, slotId) {
+    const robot = robotsState.robots.find((entry) => entry.id === robotId);
+    const slot = getPathSlot(slotId);
+    if (!robot || !slot) {
+      return false;
+    }
+
+    if (slot.robotIds.length >= 3 && !slot.robotIds.includes(robot.id)) {
+      setWarning(`${slot.label} is already full with 3 robots.`);
+      render();
+      return false;
+    }
+
+    robotsState.pathSlots.forEach((pathSlot) => {
+      pathSlot.robotIds = pathSlot.robotIds.filter((entry) => entry !== robot.id);
+    });
+
+    if (!slot.robotIds.includes(robot.id)) {
+      slot.robotIds.push(robot.id);
+    }
+
+    robot.slotId = slot.id;
+    robot.destination = { x: slot.x, y: slot.y, label: slot.label };
+    robot.status = "moving";
+    setWarning(`${robot.name} moving to ${slot.label}.`);
+    syncPlacedRobots();
+    render();
+    return true;
   }
 
   function assembleRobot() {
     autoFillSelection();
     const selectedItems = getSelectedParts();
     if (selectedItems.length !== ROBOT_REQUIRED_PARTS.length) {
-      setWarning("팔, 다리, 머리, 몸통을 각각 하나씩 선택해야 조립할 수 있습니다.");
+      setWarning("One Arm, Legs, Head, and Torso part are required.");
       render();
       return null;
     }
 
     const itemIds = selectedItems.map((item) => item.id);
     if (new Set(itemIds).size !== itemIds.length) {
-      setWarning("같은 부품이 중복 선택되었습니다. 다시 선택해 주세요.");
+      setWarning("The same part was selected twice. Choose again.");
       render();
       return null;
     }
 
     const goldCost = calculateGoldCost(selectedItems);
     const powerCost = calculatePowerCost(selectedItems);
-
     if ((gameState.gold ?? 0) < goldCost) {
-      setWarning(`골드가 부족합니다. 필요 골드: ${goldCost}`);
+      setWarning(`Not enough gold. Required: ${goldCost}G.`);
       render();
       return null;
     }
 
     if ((gameState.usedPower ?? 0) + powerCost > (gameState.maxPower ?? 0)) {
-      setWarning(`전력이 부족합니다. 필요 전력: ${powerCost}`);
+      setWarning(`Not enough power. Required: ${powerCost}.`);
       render();
       return null;
     }
 
     const consumedParts = inventorySystem.consumeItemsByIds(itemIds);
     if (consumedParts.length !== ROBOT_REQUIRED_PARTS.length) {
-      setWarning("선택한 부품을 인벤토리에서 확인할 수 없습니다.");
+      setWarning("Selected parts are no longer in inventory.");
       render();
       return null;
     }
 
     const rank = calculateRobotRank(consumedParts);
+    const torsoRank = consumedParts.find((part) => part.type === "torso")?.rank ?? rank;
     const robot = {
       id: nextRobotId(),
       name: `RF-${robotsState.lastRobotId.toString().padStart(2, "0")}`,
       parts: Object.fromEntries(consumedParts.map((part) => [part.type, part])),
       rank,
-      hp: 90 + ROBOT_RANKS.indexOf(rank) * 35,
-      maxHP: 90 + ROBOT_RANKS.indexOf(rank) * 35,
+      hp: 105 + getRankIndex(rank) * 40,
+      maxHP: 105 + getRankIndex(rank) * 40,
       status: "idle",
       powerCost,
-      aura: ROBOT_RANK_AURA[consumedParts.find((part) => part.type === "torso")?.rank ?? rank],
+      aura: ROBOT_RANK_AURA[torsoRank],
       x: 96,
       y: 478,
       destination: { x: 96, y: 478, label: "Base" },
       slotId: null,
       auraTargets: [],
+      auraBonus: 0,
       recoveryRemaining: 0,
       isRecovering: false,
       combatEnabled: true,
@@ -318,48 +338,23 @@ function createRobotsModule() {
     gameState.usedPower = (gameState.usedPower ?? 0) + powerCost;
     robotsState.robots.push(robot);
     robotsState.selectedPartIds = { arm: null, legs: null, head: null, torso: null };
-    setWarning(`${robot.name} 조립 완료. 비용: ${goldCost}G / ${powerCost} 전력`);
+
+    const firstSlot = getFirstAvailableSlot();
+    if (firstSlot) {
+      moveRobotToSlot(robot.id, firstSlot.id);
+      setWarning(`${robot.name} assembled and auto-deployed to ${firstSlot.label}.`);
+    } else {
+      setWarning(`${robot.name} assembled. No open path slot is available.`);
+    }
+
     syncPlacedRobots();
     render();
     return robot;
   }
 
-  function getPathSlot(slotId) {
-    return robotsState.pathSlots.find((slot) => slot.id === slotId) ?? null;
-  }
-
-  function moveRobotToSlot(robotId, slotId) {
-    const robot = robotsState.robots.find((entry) => entry.id === robotId);
-    const slot = getPathSlot(slotId);
-    if (!robot || !slot) {
-      return false;
-    }
-
-    if (slot.robotIds.length >= 3) {
-      setWarning(`${slot.label} 위치는 이미 로봇 3대로 가득 찼습니다.`);
-      render();
-      return false;
-    }
-
-    robotsState.pathSlots.forEach((pathSlot) => {
-      pathSlot.robotIds = pathSlot.robotIds.filter((entry) => entry !== robot.id);
-    });
-
-    slot.robotIds.push(robot.id);
-    robot.slotId = slot.id;
-    robot.destination = { x: slot.x, y: slot.y, label: slot.label };
-    robot.status = "moving";
-    setWarning(`${robot.name} 이동 명령: ${slot.label}`);
-    syncPlacedRobots();
-    render();
-    return true;
-  }
-
   function returnRobotToBase(robotId) {
     const robot = robotsState.robots.find((entry) => entry.id === robotId);
-    if (!robot) {
-      return false;
-    }
+    if (!robot) return false;
 
     robotsState.pathSlots.forEach((slot) => {
       slot.robotIds = slot.robotIds.filter((entry) => entry !== robot.id);
@@ -372,53 +367,77 @@ function createRobotsModule() {
     return true;
   }
 
-  function damageRobot(robotId, amount) {
-    const robot = robotsState.robots.find((entry) => entry.id === robotId);
-    if (!robot || robot.isRecovering) {
-      return false;
-    }
-
-    robot.hp = Math.max(0, robot.hp - amount);
-    if (robot.hp === 0) {
-      startRobotRecovery(robot);
-    }
-
-    render();
-    return true;
-  }
-
   function startRobotRecovery(robot) {
-    if (!robot || robot.isRecovering) {
-      return;
-    }
-
+    if (!robot || robot.isRecovering) return;
     robot.isRecovering = true;
     robot.combatEnabled = false;
     robot.status = "recovering";
-    robot.recoveryRemaining = 6 + ROBOT_RANKS.indexOf(robot.rank) * 2;
+    robot.recoveryRemaining = 5 + getRankIndex(robot.rank) * 2;
     robot.destination = { x: 96, y: 478, label: "Repair Bay" };
     robot.currentTargetId = null;
     robotsState.pathSlots.forEach((slot) => {
       slot.robotIds = slot.robotIds.filter((entry) => entry !== robot.id);
     });
     robot.slotId = null;
-    setWarning(`${robot.name} 파괴. 자동 회복 프로토콜 시작`);
+    setWarning(`${robot.name} disabled. It is returning for automatic repair.`);
+  }
+
+  function damageRobot(robotId, amount) {
+    const robot = robotsState.robots.find((entry) => entry.id === robotId);
+    if (!robot || robot.isRecovering) return false;
+    robot.hp = Math.max(0, robot.hp - amount);
+    if (robot.hp === 0) startRobotRecovery(robot);
+    render();
+    return true;
+  }
+
+  function canDisassemble(robot) {
+    return !robot.slotId && Math.hypot(robot.x - 96, robot.y - 478) <= 18;
+  }
+
+  function disassembleRobot(robotId, toolItemId) {
+    const robot = robotsState.robots.find((entry) => entry.id === robotId);
+    const tool = getItemById(toolItemId);
+    if (!robot || !tool?.isDisassemblyTool || !canDisassemble(robot)) {
+      setWarning("Disassembly requires a robot at base and a disassembly kit.");
+      render();
+      return false;
+    }
+
+    inventorySystem.removeItemById(toolItemId);
+    Object.values(robot.parts).forEach((part) => {
+      inventorySystem.addItem(inventorySystem.makeItem(part.type, part.rank));
+    });
+
+    gameState.usedPower = Math.max(0, (gameState.usedPower ?? 0) - robot.powerCost);
+    robotsState.robots = robotsState.robots.filter((entry) => entry.id !== robotId);
+    gameState.robotFactory.robots = robotsState.robots;
+    syncPlacedRobots();
+    setWarning(`${robot.name} disassembled. Parts returned to inventory.`);
+    render();
+    return true;
+  }
+
+  function choosePart(type, itemId) {
+    robotsState.selectedPartIds[type] = itemId;
+    render();
+  }
+
+  function distanceBetween(a, b) {
+    return Math.hypot(a.x - b.x, a.y - b.y);
   }
 
   function computeAuraTargets() {
     robotsState.robots.forEach((robot) => {
+      robot.auraBonus = 0;
       robot.auraTargets = [];
     });
 
     robotsState.robots.forEach((source) => {
+      if (!source.slotId || source.isRecovering) return;
       robotsState.robots.forEach((target) => {
-        if (source.id === target.id) {
-          return;
-        }
-        const dx = source.x - target.x;
-        const dy = source.y - target.y;
-        const distance = Math.hypot(dx, dy);
-        if (distance <= source.aura.radius) {
+        if (source.id === target.id || !target.slotId || target.isRecovering) return;
+        if (distanceBetween(source, target) <= source.aura.radius) {
           target.auraBonus = Math.max(target.auraBonus ?? 0, source.aura.bonus);
           source.auraTargets.push(target.id);
         }
@@ -426,24 +445,14 @@ function createRobotsModule() {
     });
   }
 
-  function syncPlacedRobots() {
-    gameState.placedRobots = robotsState.robots.filter((robot) => robot.slotId && robot.combatEnabled && !robot.isRecovering);
-  }
-
-  function distanceBetween(a, b) {
-    return Math.hypot(a.x - b.x, a.y - b.y);
-  }
-
-  function findNearestEnemy(robot, enemies) {
+  function findNearestEnemy(robot) {
+    const enemies = Array.isArray(gameState.enemies) ? gameState.enemies : [];
+    const effectiveRange = robot.attackRange * (1 + (robot.auraBonus ?? 0));
     let target = null;
     let bestDistance = Number.POSITIVE_INFINITY;
-    const effectiveRange = robot.attackRange * (1 + (robot.auraBonus ?? 0));
 
     for (const enemy of enemies) {
-      if (!enemy || enemy.hp <= 0 || enemy.isDead || enemy.dead) {
-        continue;
-      }
-
+      if (!enemy || enemy.hp <= 0 || enemy.isDead || enemy.dead) continue;
       const enemyDistance = distanceBetween(robot, enemy);
       if (enemyDistance <= effectiveRange && enemyDistance < bestDistance) {
         target = enemy;
@@ -454,73 +463,77 @@ function createRobotsModule() {
     return target;
   }
 
-  function applyDamageToEnemy(enemy, amount) {
-    if (!enemy || amount <= 0) {
-      return;
-    }
-
-    if (window.enemySystem?.damageEnemy) {
-      window.enemySystem.damageEnemy(enemy.id, amount);
-      return;
-    }
-
-    enemy.hp = Math.max(0, (enemy.hp ?? 0) - amount);
-    if (enemy.hp === 0) {
-      enemy.isDead = true;
-      enemy.dead = true;
-    }
-  }
-
   function updateRobotCombat(nowSeconds) {
-    const enemies = Array.isArray(gameState.enemies) ? gameState.enemies : [];
-    if (enemies.length === 0) {
-      robotsState.robots.forEach((robot) => {
-        robot.currentTargetId = null;
-      });
-      return;
-    }
-
     robotsState.robots.forEach((robot) => {
       if (!robot.slotId || !robot.combatEnabled || robot.isRecovering || robot.status === "moving" || robot.status === "returning") {
         robot.currentTargetId = null;
         return;
       }
 
-      const target = findNearestEnemy(robot, enemies);
+      const target = findNearestEnemy(robot);
       if (!target) {
         robot.currentTargetId = null;
+        if (robot.status === "attacking") robot.status = "defending";
         return;
       }
 
       robot.currentTargetId = target.id;
-      if (nowSeconds - robot.lastAttackAt < robot.attackCooldown) {
-        return;
-      }
+      if (nowSeconds - robot.lastAttackAt < robot.attackCooldown) return;
 
       const totalDamage = Math.round(robot.attackDamage * (1 + (robot.auraBonus ?? 0)));
-      applyDamageToEnemy(target, totalDamage);
+      window.enemySystem?.damageEnemy?.(target.id, totalDamage);
       robot.lastAttackAt = nowSeconds;
       robot.attackFlashUntil = performance.now() + ROBOT_ATTACK_FLASH_MS;
       robot.status = "attacking";
-      gameState.message = `${robot.name}이(가) 적 로봇에 ${totalDamage} 피해를 입혔습니다.`;
+      gameState.message = `${robot.name} fires for ${totalDamage} damage.`;
     });
+  }
+
+  function updateRobots(deltaSeconds) {
+    const nowSeconds = performance.now() / 1000;
+    robotsState.robots.forEach((robot) => {
+      if (!robot.isRecovering && robot.hp <= 0) {
+        startRobotRecovery(robot);
+      }
+
+      const destination = robot.destination ?? { x: robot.x, y: robot.y };
+      const dx = destination.x - robot.x;
+      const dy = destination.y - robot.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance > 1) {
+        const speed = robot.isRecovering ? 70 : 98;
+        robot.x += (dx / distance) * speed * deltaSeconds;
+        robot.y += (dy / distance) * speed * deltaSeconds;
+      } else if (robot.status === "moving" || robot.status === "returning") {
+        robot.status = robot.slotId ? "defending" : "idle";
+      }
+
+      if (robot.isRecovering) {
+        robot.recoveryRemaining = Math.max(0, robot.recoveryRemaining - deltaSeconds);
+        if (robot.recoveryRemaining === 0) {
+          robot.isRecovering = false;
+          robot.combatEnabled = true;
+          robot.hp = robot.maxHP;
+          robot.status = "idle";
+          setWarning(`${robot.name} repair complete. Deploy it again when ready.`);
+        }
+      }
+    });
+
+    computeAuraTargets();
+    updateRobotCombat(nowSeconds);
+    syncPlacedRobots();
   }
 
   function drawRobotSprites() {
     const canvas = document.getElementById("game-canvas");
     const ctx = canvas?.getContext("2d");
-    if (!ctx) {
-      return;
-    }
+    if (!ctx) return;
 
     ctx.save();
     ctx.imageSmoothingEnabled = false;
 
     for (const robot of robotsState.robots) {
-      if (!robot || typeof robot.x !== "number" || typeof robot.y !== "number") {
-        continue;
-      }
-
       const drawX = Math.round(robot.x - ROBOT_SPRITE_SIZE / 2);
       const drawY = Math.round(robot.y - ROBOT_SPRITE_SIZE / 2);
       if (robotSpriteAsset.loaded) {
@@ -540,7 +553,7 @@ function createRobotsModule() {
       if (robot.attackFlashUntil > performance.now() && robot.currentTargetId) {
         const target = (gameState.enemies ?? []).find((enemy) => enemy.id === robot.currentTargetId);
         if (target) {
-          ctx.strokeStyle = "rgba(255, 159, 107, 0.9)";
+          ctx.strokeStyle = "rgba(255, 190, 118, 0.95)";
           ctx.lineWidth = 2;
           ctx.beginPath();
           ctx.moveTo(Math.round(robot.x), Math.round(robot.y - 4));
@@ -551,86 +564,6 @@ function createRobotsModule() {
     }
 
     ctx.restore();
-  }
-
-  function updateRobots(deltaSeconds) {
-    const nowSeconds = performance.now() / 1000;
-    robotsState.robots.forEach((robot) => {
-      robot.auraBonus = 0;
-
-      if (!robot.isRecovering && robot.hp <= 0) {
-        startRobotRecovery(robot);
-      }
-
-      const destination = robot.destination ?? { x: robot.x, y: robot.y };
-      const dx = destination.x - robot.x;
-      const dy = destination.y - robot.y;
-      const distance = Math.hypot(dx, dy);
-      if (distance > 1) {
-        const speed = robot.isRecovering ? 60 : 84;
-        robot.x += (dx / distance) * speed * deltaSeconds;
-        robot.y += (dy / distance) * speed * deltaSeconds;
-      } else if (robot.status === "moving" || robot.status === "returning" || robot.status === "attacking") {
-        robot.status = robot.slotId ? "defending" : "idle";
-      }
-
-      if (robot.isRecovering) {
-        robot.recoveryRemaining = Math.max(0, robot.recoveryRemaining - deltaSeconds);
-        if (robot.recoveryRemaining === 0) {
-          robot.isRecovering = false;
-          robot.combatEnabled = true;
-          robot.hp = robot.maxHP;
-          robot.status = "idle";
-          setWarning(`${robot.name} 회복 완료. 재전투 가능`);
-        }
-      }
-    });
-
-    computeAuraTargets();
-    updateRobotCombat(nowSeconds);
-    syncPlacedRobots();
-  }
-
-  function canDisassemble(robot) {
-    return !robot.slotId && Math.hypot(robot.x - 96, robot.y - 478) <= 18;
-  }
-
-  function disassembleRobot(robotId, toolItemId) {
-    const robot = robotsState.robots.find((entry) => entry.id === robotId);
-    if (!robot) {
-      return false;
-    }
-
-    if (!canDisassemble(robot)) {
-      setWarning("분해는 기지 귀환 상태에서만 가능합니다.");
-      render();
-      return false;
-    }
-
-    const tool = getItemById(toolItemId);
-    if (!tool?.isDisassemblyTool) {
-      setWarning("분해 키트를 드래그해 넣어야 합니다.");
-      render();
-      return false;
-    }
-
-    inventorySystem.removeItemById(toolItemId);
-    Object.values(robot.parts).forEach((part) => {
-      inventorySystem.addItem({ ...part, id: inventorySystem.makeItem(part.type, part.rank).id });
-    });
-
-    gameState.usedPower = Math.max(0, (gameState.usedPower ?? 0) - robot.powerCost);
-    robotsState.robots = robotsState.robots.filter((entry) => entry.id !== robotId);
-    gameState.robotFactory.robots = robotsState.robots;
-    setWarning(`${robot.name} 분해 완료. 부품이 인벤토리로 환원되었습니다.`);
-    syncPlacedRobots();
-    render();
-    return true;
-  }
-
-  function choosePart(type, itemId) {
-    robotsState.selectedPartIds[type] = itemId;
-    render();
   }
 
   function renderPartsPanel() {
@@ -644,12 +577,12 @@ function createRobotsModule() {
               ${item.label}
             </button>
           `).join("")
-        : `<div class="robot-meta">사용 가능한 ${type} 부품 없음</div>`;
+        : `<div class="robot-meta">No available ${TYPE_LABELS[type]} part</div>`;
 
       return `
         <div class="robot-part-row">
-          <strong>${type.toUpperCase()}</strong>
-          <div class="robot-meta">선택: ${selected ? `${selected.label} / ${selected.saleValue}G` : "없음"}</div>
+          <strong>${TYPE_LABELS[type]}</strong>
+          <div class="robot-meta">Selected: ${selected ? `${selected.label} / ${selected.saleValue}G` : "none"}</div>
           ${candidateButtons}
         </div>
       `;
@@ -664,8 +597,8 @@ function createRobotsModule() {
       <section class="robot-panel">
         <h3 class="robot-subtitle">Fabricator</h3>
         <div class="robot-parts">${rows}</div>
-        <div class="robot-meta" style="margin-top:10px;">예상 비용: ${goldCost}G / ${powerCost} 전력</div>
-        <button type="button" data-action="assemble-robot">조립 실행</button>
+        <div class="robot-meta" style="margin-top:10px;">Estimated cost: ${goldCost}G / ${powerCost} power</div>
+        <button type="button" data-action="assemble-robot">Assemble and Auto-Deploy</button>
       </section>
     `;
   }
@@ -674,7 +607,7 @@ function createRobotsModule() {
     const rows = robotsState.pathSlots.map((slot) => `
       <div class="robot-slot-row">
         <strong>${slot.label}</strong>
-        <div class="robot-meta">로봇 ${slot.robotIds.length}/3, 포탑 ${slot.turretCount}/1</div>
+        <div class="robot-meta">Robots ${slot.robotIds.length}/3</div>
       </div>
     `).join("");
 
@@ -689,47 +622,29 @@ function createRobotsModule() {
   function renderRobotCard(robot) {
     const commandButtons = ROBOT_PATH_SLOTS.map((slot) => `
       <button type="button" data-action="move-robot" data-robot-id="${robot.id}" data-slot-id="${slot.id}">
-        ${slot.label} 이동
+        Move to ${slot.label}
       </button>
     `).join("");
 
     return `
       <article class="robot-card">
         <strong>${robot.name} / ${robot.rank}</strong>
-        <div class="robot-meta">HP ${Math.round(robot.hp)}/${robot.maxHP} / 상태 ${robot.status}</div>
-        <div class="robot-meta">위치 ${Math.round(robot.x)}, ${Math.round(robot.y)} / 오라 +${Math.round((robot.auraBonus ?? 0) * 100)}%</div>
-        <div class="robot-meta">목표 ${robot.destination?.label ?? "Base"} / 버프 대상 ${robot.auraTargets.length}기</div>
+        <div class="robot-meta">HP ${Math.round(robot.hp)}/${robot.maxHP} / status ${robot.status}</div>
+        <div class="robot-meta">damage ${robot.attackDamage}, range ${Math.round(robot.attackRange)}, aura +${Math.round((robot.auraBonus ?? 0) * 100)}%</div>
+        <div class="robot-meta">target ${robot.destination?.label ?? "Base"} / power ${robot.powerCost}</div>
         <div class="robot-commands">
           ${commandButtons}
-          <button type="button" data-action="return-robot" data-robot-id="${robot.id}">기지 귀환</button>
-          <button type="button" data-action="damage-robot" data-robot-id="${robot.id}">피해 테스트</button>
+          <button type="button" data-action="return-robot" data-robot-id="${robot.id}">Return to Base</button>
+          <button type="button" data-action="damage-robot" data-robot-id="${robot.id}">Damage Test</button>
         </div>
       </article>
-    `;
-  }
-
-  function renderDisassemblyPanel() {
-    const idleRobots = robotsState.robots.filter((robot) => canDisassemble(robot));
-    const robotOptions = idleRobots.length > 0
-      ? idleRobots.map((robot) => `<option value="${robot.id}">${robot.name}</option>`).join("")
-      : `<option value="">기지 대기 로봇 없음</option>`;
-
-    return `
-      <section class="robot-panel">
-        <h3 class="robot-subtitle">Disassembly</h3>
-        <div class="robot-meta">로봇을 기지로 귀환시킨 뒤 분해 키트를 드래그해 넣습니다.</div>
-        <select id="robot-disassembly-target" class="robot-inline-select">
-          ${robotOptions}
-        </select>
-        <div class="robot-dropzone" id="robot-disassembly-dropzone">분해 키트를 여기로 드래그</div>
-      </section>
     `;
   }
 
   function renderRosterPanel() {
     const cards = robotsState.robots.length > 0
       ? robotsState.robots.map(renderRobotCard).join("")
-      : `<div class="robot-meta">조립된 로봇이 아직 없습니다.</div>`;
+      : `<div class="robot-meta">No robots assembled yet.</div>`;
 
     return `
       <section class="robot-panel">
@@ -748,7 +663,6 @@ function createRobotsModule() {
       </section>
       <section class="robot-column robot-column-secondary">
         ${renderSlotsPanel()}
-        ${renderDisassemblyPanel()}
         ${renderRosterPanel()}
       </section>
     `;
@@ -766,29 +680,6 @@ function createRobotsModule() {
     mount.querySelectorAll("[data-action='damage-robot']").forEach((button) => {
       button.addEventListener("click", () => damageRobot(button.dataset.robotId, 45));
     });
-
-    const dropzone = document.getElementById("robot-disassembly-dropzone");
-    dropzone?.addEventListener("dragover", (event) => {
-      event.preventDefault();
-      dropzone.dataset.active = "true";
-    });
-    dropzone?.addEventListener("dragleave", () => {
-      dropzone.dataset.active = "false";
-    });
-    dropzone?.addEventListener("drop", (event) => {
-      event.preventDefault();
-      dropzone.dataset.active = "false";
-      const payloadText = event.dataTransfer?.getData("text/plain") ?? "";
-      if (!payloadText) {
-        return;
-      }
-      const payload = JSON.parse(payloadText);
-      const targetSelect = document.getElementById("robot-disassembly-target");
-      const robotId = targetSelect?.value;
-      if (robotId) {
-        disassembleRobot(robotId, payload.id);
-      }
-    });
   }
 
   let lastTick = performance.now();
@@ -800,9 +691,19 @@ function createRobotsModule() {
     window.requestAnimationFrame(tick);
   }
 
-  window.addEventListener("inventory:changed", () => {
-    render();
-  });
+  const previousAdvanceTime = window.advanceTime;
+  if (typeof previousAdvanceTime === "function") {
+    window.advanceTime = (ms) => {
+      previousAdvanceTime(ms);
+      const steps = Math.max(1, Math.round(ms / (1000 / 60)));
+      for (let i = 0; i < steps; i += 1) {
+        updateRobots(1 / 60);
+      }
+      drawRobotSprites();
+    };
+  }
+
+  window.addEventListener("inventory:changed", render);
 
   render();
   syncPlacedRobots();

@@ -470,7 +470,7 @@ function resolveDroppedItemPosition(item) {
 function collectGold(item) {
   const goldAmount = Math.max(0, Number(item?.amount) || 0);
   gameState.gold = (gameState.gold || 0) + goldAmount;
-  setStatus(`\uACE8\uB4DC ${goldAmount} \uD68D\uB4DD.`);
+  setStatus(`Collected ${goldAmount}G.`);
   syncInventoryDisplay();
   return true;
 }
@@ -479,7 +479,7 @@ function lootItem(item, index) {
   const position = resolveDroppedItemPosition(item);
   const distance = Math.hypot(heroState.x - position.x, heroState.y - position.y);
   if (distance > HERO_LOOT_RANGE) {
-    setStatus("\uC544\uC774\uD15C\uC774 \uB108\uBB34 \uBA49\uB2C8\uB2E4.");
+    setStatus("Item is too far away.");
     return false;
   }
 
@@ -490,19 +490,19 @@ function lootItem(item, index) {
   }
 
   if (!inventoryHasSpace()) {
-    setStatus("\uC778\uBCA4\uD1A0\uB9AC\uAC00 \uAF49 \uCC3C\uC2B5\uB2C8\uB2E4.");
+    setStatus("Inventory is full.");
     return false;
   }
 
   const inventoryItem = normalizeInventoryItem(item && item.payload ? item.payload : item);
   const added = addItemToInventory(inventoryItem);
   if (!added) {
-    setStatus("\uC778\uBCA4\uD1A0\uB9AC\uAC00 \uAF49 \uCC3C\uC2B5\uB2C8\uB2E4.");
+    setStatus("Inventory is full.");
     return false;
   }
 
   gameState.droppedItems.splice(index, 1);
-  setStatus(`${formatItemLabel(inventoryItem)} \uD68C\uC218 \uC644\uB8CC.`);
+  setStatus(`${formatItemLabel(inventoryItem)} recovered.`);
   renderHeroSlots();
   syncInventoryDisplay();
   return true;
@@ -578,7 +578,7 @@ function performAttack(options = {}) {
   const target = findAttackTarget();
   if (!target) {
     if (!silent) {
-      setStatus("\uADFC\uC811 \uACF5\uACA9 \uBC94\uC704\uC5D0 \uC801\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.");
+      setStatus("No enemy in melee range.");
     }
     return false;
   }
@@ -586,7 +586,7 @@ function performAttack(options = {}) {
   heroState.attackCooldown = HERO_ATTACK_COOLDOWN;
   damageEnemy(target, HERO_ATTACK_DAMAGE);
   pruneDeadEnemies();
-  setStatus(automatic ? `\uC790\uB3D9 \uACF5\uACA9 \uC801\uC911: ${HERO_ATTACK_DAMAGE} \uD53C\uD574.` : `\uADFC\uC811 \uACF5\uACA9 \uC801\uC911: ${HERO_ATTACK_DAMAGE} \uD53C\uD574.`);
+  setStatus(automatic ? `Auto attack hit for ${HERO_ATTACK_DAMAGE}.` : `Melee attack hit for ${HERO_ATTACK_DAMAGE}.`);
   return true;
 }
 

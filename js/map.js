@@ -1,8 +1,8 @@
 ﻿const MAP_WIDTH = 800;
 const MAP_HEIGHT = 600;
 const TILE_SIZE = 40;
-const HERO_REVEAL_RADIUS = 88;
-const BASE_REVEAL_RADIUS = 150;
+const HERO_REVEAL_RADIUS = 110;
+const BASE_REVEAL_RADIUS = 230;
 const VISION_TURRET_REVEAL_RADIUS = 110;
 const MINIMAP_WIDTH = 200;
 const MINIMAP_HEIGHT = 150;
@@ -13,9 +13,9 @@ const REGION_THEMES = {
   A: {
     skyTop: "#0d121b",
     skyBottom: "#171111",
-    dust: "rgba(255, 107, 45, 0.1)",
-    terrain: "#241c1d",
-    terrainEdge: "#3b2820",
+    dust: "rgba(255, 126, 62, 0.16)",
+    terrain: "#2a2224",
+    terrainEdge: "#4a3026",
     accent: "#ff6b2d",
     accentSoft: "#ff9f6b",
   },
@@ -419,7 +419,7 @@ function drawSlots(ctx, gameState, theme) {
 
 function drawFog(ctx, gameState) {
   ctx.save();
-  ctx.fillStyle = "rgba(0, 0, 0, 0.84)";
+  ctx.fillStyle = "rgba(0, 0, 0, 0.68)";
   ctx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
   ctx.globalCompositeOperation = "destination-out";
 
@@ -676,14 +676,14 @@ function renderScene(ctx) {
 
   const theme = getTheme(gameState.currentRegion);
   drawBackground(ctx, theme);
+  drawPath(ctx, gameState, theme);
   drawBase(ctx, gameState, theme);
+  drawSlots(ctx, gameState, theme);
   drawDroppedTurretHints(ctx, gameState);
   drawEnemies(ctx, gameState);
   drawDroppedItems(ctx, gameState);
   drawHero(ctx, gameState);
   drawFog(ctx, gameState);
-  drawPath(ctx, gameState, theme);
-  drawSlots(ctx, gameState, theme);
   drawMinimap(gameState);
 }
 

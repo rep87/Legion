@@ -3,15 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>IRON FRONTIER</title>
+  <title>IRON FRONTIER - Stage 1 MVP</title>
   <style>
     :root {
-      --line: #243246;
+      --line: #263246;
       --accent: #ff6b2d;
-      --accent-soft: #ff9f6b;
+      --accent-soft: #ffad73;
       --text: #e7edf7;
-      --muted: #8b98aa;
-      --shadow: rgba(0, 0, 0, 0.35);
+      --muted: #91a0b5;
+      --panel: rgba(12, 17, 27, 0.96);
+      --panel-2: rgba(19, 28, 42, 0.96);
+      --shadow: rgba(0, 0, 0, 0.36);
     }
 
     * {
@@ -23,18 +25,16 @@
       min-height: 100vh;
       font-family: "Courier New", monospace;
       color: var(--text);
-      background:
-        radial-gradient(circle at top, rgba(255, 107, 45, 0.12), transparent 28%),
-        linear-gradient(180deg, #05070b 0%, #0b1119 55%, #06080d 100%);
+      background: linear-gradient(180deg, #05070b 0%, #0b1119 55%, #06080d 100%);
       display: flex;
       justify-content: center;
-      align-items: center;
-      padding: 24px;
+      align-items: flex-start;
+      padding: 20px;
     }
 
     .shell {
       width: min(1500px, 100%);
-      background: rgba(8, 11, 18, 0.92);
+      background: rgba(8, 11, 18, 0.94);
       border: 1px solid var(--line);
       box-shadow: 0 18px 60px var(--shadow);
       padding: 16px;
@@ -44,21 +44,21 @@
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 12px;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
 
     .stat,
-    .utility-panel,
+    .mission-panel,
     .command-panel,
     .inventory,
     .robot-layout {
-      background: linear-gradient(180deg, rgba(16, 23, 34, 0.98), rgba(9, 13, 20, 0.98));
+      background: linear-gradient(180deg, var(--panel-2), var(--panel));
       border: 1px solid var(--line);
     }
 
     .stat {
       padding: 12px 14px;
-      min-height: 72px;
+      min-height: 70px;
     }
 
     .stat-label {
@@ -67,48 +67,50 @@
       color: var(--muted);
       margin-bottom: 6px;
       text-transform: uppercase;
-      letter-spacing: 1px;
     }
 
     .stat-value {
-      font-size: 28px;
+      font-size: 26px;
       color: var(--text);
     }
 
     .layout {
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 14px;
     }
 
-    .utility-panel {
+    .mission-panel {
       padding: 12px;
     }
 
-    .utility-grid {
+    .mission-grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: 1.2fr repeat(3, minmax(0, 1fr));
       gap: 10px;
+      align-items: stretch;
+    }
+
+    .mission-copy {
+      margin: 0;
+      color: #cbd5e1;
+      font-size: 13px;
+      line-height: 1.45;
+      padding: 8px 2px;
     }
 
     .battle-layout {
       display: grid;
-      grid-template-columns: 800px minmax(320px, 1fr);
+      grid-template-columns: 800px minmax(330px, 1fr);
       gap: 16px;
       align-items: start;
     }
 
-    .battlefield-column {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
+    .battlefield-column,
     .right-column {
       display: flex;
       flex-direction: column;
-      gap: 16px;
-      min-height: 100%;
+      gap: 14px;
     }
 
     .command-panel,
@@ -151,7 +153,7 @@
       font: inherit;
       cursor: pointer;
       text-align: left;
-      min-height: 64px;
+      min-height: 60px;
     }
 
     button:hover {
@@ -159,11 +161,16 @@
       background: linear-gradient(180deg, #6a2a13, #3e1409);
     }
 
+    button[hidden] {
+      display: none;
+    }
+
     .button-caption {
       display: block;
       font-size: 11px;
       color: var(--muted);
       margin-top: 4px;
+      line-height: 1.35;
     }
 
     .canvas-wrap {
@@ -191,7 +198,6 @@
       height: 150px;
       border: 1px solid rgba(255, 107, 45, 0.6);
       background: rgba(4, 6, 10, 0.75);
-      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
       pointer-events: none;
     }
 
@@ -199,10 +205,10 @@
       position: absolute;
       left: 8px;
       top: 8px;
+      z-index: 2;
       font-size: 11px;
       color: var(--muted);
       text-transform: uppercase;
-      letter-spacing: 1px;
     }
 
     .status-line {
@@ -213,8 +219,9 @@
       padding: 8px 10px;
       font-size: 12px;
       color: var(--text);
-      background: rgba(7, 10, 15, 0.7);
+      background: rgba(7, 10, 15, 0.78);
       border: 1px solid rgba(36, 50, 70, 0.8);
+      z-index: 3;
     }
 
     .inventory {
@@ -230,9 +237,7 @@
     .slot {
       aspect-ratio: 1 / 1;
       border: 1px solid var(--line);
-      background:
-        linear-gradient(180deg, rgba(25, 35, 50, 0.95), rgba(10, 14, 22, 0.95)),
-        linear-gradient(90deg, transparent 49%, rgba(255, 255, 255, 0.04) 50%, transparent 51%);
+      background: linear-gradient(180deg, rgba(25, 35, 50, 0.95), rgba(10, 14, 22, 0.95));
       display: flex;
       align-items: center;
       justify-content: center;
@@ -245,26 +250,20 @@
     }
 
     @media (max-width: 1480px) {
-      .battle-layout {
+      .battle-layout,
+      .mission-grid {
         grid-template-columns: 1fr;
-      }
-
-      .battlefield-column,
-      .right-column {
-        width: 100%;
       }
 
       .canvas-wrap,
       canvas,
       .inventory {
         width: 100%;
-        height: auto;
       }
     }
 
     @media (max-width: 900px) {
       .topbar,
-      .utility-grid,
       .button-grid.command-grid {
         grid-template-columns: 1fr;
       }
@@ -276,7 +275,7 @@
     <section class="topbar">
       <div class="stat">
         <span class="stat-label">Gold</span>
-        <strong class="stat-value" id="gold-value">100</strong>
+        <strong class="stat-value" id="gold-value">120</strong>
       </div>
       <div class="stat">
         <span class="stat-label">Power</span>
@@ -293,21 +292,24 @@
     </section>
 
     <section class="layout">
-      <section class="utility-panel">
-        <h2 class="panel-title">Debug Controls</h2>
-        <div class="utility-grid">
-          <button id="damage-base-button" type="button">
-            기지 피해 테스트
-            <span class="button-caption">기지 HP UI 반응을 확인합니다.</span>
+      <section class="mission-panel">
+        <h2 class="panel-title">Stage 1 Mission</h2>
+        <div class="mission-grid">
+          <p class="mission-copy">Hold the Sector A outpost. Build robots from salvaged parts and survive through the fifth boss wave.</p>
+          <button id="focus-battlefield-button" type="button">
+            Battlefield
+            <span class="button-caption">Move with WASD or click, attack with Space</span>
           </button>
-          <button id="use-power-button" type="button">
-            전력 사용 테스트
-            <span class="button-caption">전력 소모 후 상태 문구를 확인합니다.</span>
+          <button id="focus-fabricator-button" type="button">
+            Fabricator
+            <span class="button-caption">Pick Arm, Legs, Head, and Torso parts</span>
           </button>
           <button id="reset-battle-button" type="button">
-            전장 초기화
-            <span class="button-caption">기지 수치와 시야를 기본 상태로 되돌립니다.</span>
+            Restart Stage
+            <span class="button-caption">Reset the current Stage 1 run</span>
           </button>
+          <button id="damage-base-button" type="button" hidden>base damage</button>
+          <button id="use-power-button" type="button" hidden>use power</button>
         </div>
       </section>
 
@@ -315,9 +317,9 @@
         <section class="battlefield-column">
           <section class="canvas-wrap">
             <canvas id="game-canvas" width="800" height="600" aria-label="IRON FRONTIER battlefield"></canvas>
-            <div class="status-line" id="status-line">대기 중. 다음 웨이브 가동 버튼으로 전투를 시작합니다.</div>
+            <div class="status-line" id="status-line">Stage 1: assemble robots from parts and hold Sector A through wave 5.</div>
             <div class="minimap-slot" id="minimap-slot">
-              <span class="minimap-label">Minimap Reserved</span>
+              <span class="minimap-label">Minimap</span>
             </div>
           </section>
 
@@ -340,24 +342,16 @@
         <section class="right-column">
           <section class="command-panel">
             <h2 class="panel-title">Base Command</h2>
-            <p class="panel-copy">A지역 폐허 기지를 유지하며 웨이브를 막습니다. 전력과 기지 체력은 상단 HUD와 연동됩니다.</p>
+            <p class="panel-copy">Assemble one starter robot, let it deploy to a path slot, then start the wave. The hero finishes stragglers and recovers drops.</p>
 
             <section class="button-grid command-grid">
               <button id="start-wave-button" type="button">
-                다음 웨이브 가동
-                <span class="button-caption">현재 지역에서 전투를 시작합니다.</span>
-              </button>
-              <button id="focus-battlefield-button" type="button">
-                전장 포커스
-                <span class="button-caption">캔버스로 이동해 영웅 조작을 이어갑니다.</span>
-              </button>
-              <button id="focus-fabricator-button" type="button">
-                조립 패널로
-                <span class="button-caption">FABRICATOR 패널로 포커스를 이동합니다.</span>
+                Start Next Wave
+                <span class="button-caption">Enemy robots enter along the path toward the base.</span>
               </button>
               <button id="focus-inventory-button" type="button">
-                인벤토리 확인
-                <span class="button-caption">캔버스 아래 9칸 인벤토리로 이동합니다.</span>
+                Inventory
+                <span class="button-caption">Check parts, grades, and sellable items.</span>
               </button>
             </section>
           </section>

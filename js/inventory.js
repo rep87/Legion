@@ -1,37 +1,81 @@
 const INVENTORY_SLOT_COUNT = 9;
-const INVENTORY_TYPES = ["arm", "legs", "head", "torso", "disassembler"];
 const INVENTORY_RANKS = ["C", "B", "A", "S"];
 const INVENTORY_RANK_COLORS = {
-  C: "#8b98aa",
+  C: "#9aa8bc",
   B: "#67c1ff",
   A: "#ffb347",
   S: "#ff5f5f",
 };
+const TYPE_LABELS = {
+  arm: "Arm",
+  legs: "Legs",
+  head: "Head",
+  torso: "Torso",
+  disassembler: "Disassembly Kit",
+};
 
 function createInventoryModule() {
   const gameState = window.gameState ?? {};
-  const existingInventory = gameState.inventory;
-  const inventoryState = Array.isArray(existingInventory)
-    ? {
-        slots: existingInventory,
-        combineOffer: null,
-        warning: "",
-        lastItemId: 0,
-      }
-    : existingInventory ?? {
-        slots: new Array(INVENTORY_SLOT_COUNT).fill(null),
-        combineOffer: null,
-        warning: "",
-        lastItemId: 0,
-      };
+  const inventoryState = {
+    slots: new Array(INVENTORY_SLOT_COUNT).fill(null),
+    combineOffer: null,
+    warning: "",
+    lastItemId: 0,
+    ...(gameState.inventory && !Array.isArray(gameState.inventory) ? gameState.inventory : {}),
+  };
+
+  if (!Array.isArray(inventoryState.slots) || inventoryState.slots.length !== INVENTORY_SLOT_COUNT) {
+    inventoryState.slots = new Array(INVENTORY_SLOT_COUNT).fill(null);
+  }
 
   gameState.inventory = inventoryState;
   window.gameState = gameState;
 
-  const styleId = "inventory-module-style";
-  if (!document.getElementById(styleId)) {
+  const grid = document.getElementById("inventory-grid");
+  if (!grid) {
+    return null;
+  }
+
+  installStyles();
+  grid.dataset.enhanced = "true";
+
+  const inventorySection = grid.closest(".inventory");
+  let warningLine = inventorySection?.querySelector(".inventory-warning");
+  if (!warningLine) {
+    warningLine = document.createElement("div");
+    warningLine.className = "inventory-warning";
+    inventorySection?.appendChild(warningLine);
+  }
+
+  let popupBackdrop = document.getElementById("inventory-combine-popup");
+  if (!popupBackdrop) {
+    popupBackdrop = document.createElement("div");
+    popupBackdrop.id = "inventory-combine-popup";
+    popupBackdrop.className = "inventory-popup-backdrop";
+    popupBackdrop.innerHTML = `
+      <div class="inventory-popup" role="dialog" aria-modal="true" aria-labelledby="inventory-combine-title">
+        <h3 id="inventory-combine-title">Combine Available</h3>
+        <p id="inventory-combine-copy"></p>
+        <div class="inventory-popup-actions">
+          <button type="button" id="inventory-combine-confirm">Combine</button>
+          <button type="button" id="inventory-combine-dismiss">Later</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(popupBackdrop);
+  }
+
+  const popupCopy = document.getElementById("inventory-combine-copy");
+  const confirmButton = document.getElementById("inventory-combine-confirm");
+  const dismissButton = document.getElementById("inventory-combine-dismiss");
+
+  function installStyles() {
+    if (document.getElementById("inventory-module-style")) {
+      return;
+    }
+
     const style = document.createElement("style");
-    style.id = styleId;
+    style.id = "inventory-module-style";
     style.textContent = `
       .inventory-grid[data-enhanced="true"] {
         display: grid;
@@ -42,9 +86,7 @@ function createInventoryModule() {
         position: relative;
         min-height: 84px;
         border: 1px solid #243246;
-        background:
-          linear-gradient(180deg, rgba(25, 35, 50, 0.95), rgba(10, 14, 22, 0.95)),
-          linear-gradient(90deg, transparent 49%, rgba(255, 255, 255, 0.04) 50%, transparent 51%);
+        background: linear-gradient(180deg, rgba(25, 35, 50, 0.95), rgba(10, 14, 22, 0.95));
         padding: 8px;
         display: flex;
         flex-direction: column;
@@ -66,7 +108,6 @@ function createInventoryModule() {
       }
       .inventory-item-type {
         font-size: 14px;
-        text-transform: uppercase;
       }
       .inventory-item-rank {
         display: inline-flex;
@@ -83,15 +124,15 @@ function createInventoryModule() {
         gap: 8px;
         align-items: center;
       }
-      .inventory-item-value {
-        font-size: 11px;
+      .inventory-item-value,
+      .inventory-warning {
+        font-size: 12px;
         color: #8b98aa;
       }
       .inventory-warning {
         margin-top: 10px;
         min-height: 18px;
-        font-size: 12px;
-        color: #ff9f6b;
+        color: #ffad73;
       }
       .inventory-popup-backdrop {
         position: fixed;
@@ -114,7 +155,7 @@ function createInventoryModule() {
       }
       .inventory-popup h3 {
         margin: 0 0 10px;
-        color: #ff9f6b;
+        color: #ffad73;
         font-size: 16px;
       }
       .inventory-popup p {
@@ -135,54 +176,18 @@ function createInventoryModule() {
     document.head.appendChild(style);
   }
 
-  const grid = document.getElementById("inventory-grid");
-  if (!grid) {
-    return null;
-  }
-
-  grid.dataset.enhanced = "true";
-  const inventorySection = grid.closest(".inventory");
-  let warningLine = inventorySection?.querySelector(".inventory-warning");
-  if (!warningLine) {
-    warningLine = document.createElement("div");
-    warningLine.className = "inventory-warning";
-    inventorySection?.appendChild(warningLine);
-  }
-
-  let popupBackdrop = document.getElementById("inventory-combine-popup");
-  if (!popupBackdrop) {
-    popupBackdrop = document.createElement("div");
-    popupBackdrop.id = "inventory-combine-popup";
-    popupBackdrop.className = "inventory-popup-backdrop";
-    popupBackdrop.innerHTML = `
-      <div class="inventory-popup" role="dialog" aria-modal="true" aria-labelledby="inventory-combine-title">
-        <h3 id="inventory-combine-title">조합 가능</h3>
-        <p id="inventory-combine-copy"></p>
-        <div class="inventory-popup-actions">
-          <button type="button" id="inventory-combine-confirm">조합</button>
-          <button type="button" id="inventory-combine-dismiss">나중에</button>
-        </div>
-      </div>
-    `;
-    document.body.appendChild(popupBackdrop);
-  }
-
-  const popupCopy = document.getElementById("inventory-combine-copy");
-  const confirmButton = document.getElementById("inventory-combine-confirm");
-  const dismissButton = document.getElementById("inventory-combine-dismiss");
-
   function nextItemId() {
     inventoryState.lastItemId += 1;
     return `item-${inventoryState.lastItemId}`;
   }
 
   function makeItem(type, rank) {
-    const saleValue = { C: 10, B: 25, A: 55, S: 125 }[rank];
+    const saleValue = { C: 10, B: 25, A: 55, S: 125 }[rank] ?? 10;
     return {
       id: nextItemId(),
       type,
       rank,
-      label: type === "disassembler" ? "분해 키트" : `${type.toUpperCase()}-${rank}`,
+      label: type === "disassembler" ? "Disassembly Kit" : `${TYPE_LABELS[type] || type}-${rank}`,
       saleValue,
       isDisassemblyTool: type === "disassembler",
     };
@@ -195,14 +200,14 @@ function createInventoryModule() {
 
     const starterItems = [
       makeItem("arm", "C"),
-      makeItem("arm", "C"),
-      makeItem("arm", "C"),
       makeItem("legs", "C"),
       makeItem("head", "C"),
       makeItem("torso", "C"),
+      makeItem("arm", "C"),
+      makeItem("head", "C"),
       makeItem("disassembler", "C"),
-      makeItem("torso", "B"),
-      makeItem("head", "B"),
+      null,
+      null,
     ];
     inventoryState.slots = starterItems.slice(0, INVENTORY_SLOT_COUNT);
   }
@@ -219,7 +224,7 @@ function createInventoryModule() {
   function addItem(item) {
     const emptySlot = findEmptySlot();
     if (emptySlot === -1) {
-      setWarning("인벤토리가 가득 차서 아이템을 받을 수 없습니다.");
+      setWarning("Inventory is full. Cannot pick up the item.");
       return false;
     }
 
@@ -236,7 +241,8 @@ function createInventoryModule() {
       return null;
     }
 
-    const [item] = inventoryState.slots.splice(slotIndex, 1, null);
+    const item = inventoryState.slots[slotIndex];
+    inventoryState.slots[slotIndex] = null;
     detectCombineOffer();
     render();
     notifyChanged("remove", item);
@@ -255,6 +261,7 @@ function createInventoryModule() {
       if (!item || item.isDisassemblyTool || item.rank === "S") {
         return;
       }
+
       const key = `${item.type}:${item.rank}`;
       if (!grouped.has(key)) {
         grouped.set(key, []);
@@ -287,7 +294,7 @@ function createInventoryModule() {
     }
 
     popupBackdrop.dataset.open = "true";
-    popupCopy.textContent = `${offer.type.toUpperCase()} ${offer.rank} 부품 3개를 ${offer.nextRank} 등급으로 승급할 수 있습니다.`;
+    popupCopy.textContent = `Combine three ${TYPE_LABELS[offer.type] || offer.type} ${offer.rank} parts into one ${offer.nextRank} part.`;
   }
 
   function combineCurrentOffer() {
@@ -299,7 +306,7 @@ function createInventoryModule() {
     consumeItemsByIds(offer.itemIds);
     const upgradedItem = makeItem(offer.type, offer.nextRank);
     addItem(upgradedItem);
-    setWarning(`${offer.type.toUpperCase()} 부품이 ${offer.nextRank} 등급으로 조합되었습니다.`);
+    setWarning(`${TYPE_LABELS[offer.type] || offer.type} upgraded to ${offer.nextRank}.`);
     detectCombineOffer();
     render();
     notifyChanged("combine", upgradedItem);
@@ -317,7 +324,7 @@ function createInventoryModule() {
     }
 
     gameState.gold = (gameState.gold ?? 0) + item.saleValue;
-    setWarning(`${item.label} 판매 완료: +${item.saleValue}G`);
+    setWarning(`${item.label} sold: +${item.saleValue}G`);
     notifyChanged("sell", item);
     return true;
   }
@@ -365,24 +372,20 @@ function createInventoryModule() {
       const rankColor = INVENTORY_RANK_COLORS[item.rank] ?? "#8b98aa";
       slot.innerHTML = `
         <span class="inventory-index">SLOT ${index + 1}</span>
-        <strong class="inventory-item-type">${item.isDisassemblyTool ? "KIT" : item.type}</strong>
+        <strong class="inventory-item-type">${item.label}</strong>
         <div class="inventory-item-meta">
           <span class="inventory-item-rank" style="color:${rankColor}">${item.rank}</span>
           <span class="inventory-item-value">${item.saleValue}G</span>
         </div>
       `;
-      slot.title = item.isDisassemblyTool
-        ? "분해 아이템: 분해 구역으로 드래그해 사용"
-        : "우클릭으로 판매";
+      slot.title = item.isDisassemblyTool ? "Use on a robot that has returned to base." : "Right-click to sell.";
       grid.appendChild(slot);
     });
 
     warningLine.textContent = inventoryState.warning;
   }
 
-  confirmButton?.addEventListener("click", () => {
-    combineCurrentOffer();
-  });
+  confirmButton?.addEventListener("click", combineCurrentOffer);
   dismissButton?.addEventListener("click", dismissOffer);
 
   seedInventoryIfEmpty();
